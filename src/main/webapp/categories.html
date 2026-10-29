@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>分类管理 · AI 学习助手</title>
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .subject-block { margin-bottom: 16px; }
+    .subject-block:last-child { margin-bottom: 0; }
+    .subject-head {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 10px 14px; background: #f7f8fc; border-radius: 12px; margin-bottom: 10px;
+    }
+    .subject-head .sname { font-weight: 700; }
+    .subject-head .ops { display: flex; gap: 8px; }
+    .cat-item .name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .parent-mark { font-size: 11px; color: var(--ink-3); background: #eef0f8; border-radius: 6px; padding: 2px 6px; }
+    .modal-mask {
+      position: fixed; inset: 0; background: rgba(16, 18, 34, .45); backdrop-filter: blur(2px);
+      display: none; place-items: center; z-index: 100; padding: 20px;
+    }
+    .modal-mask.show { display: grid; }
+    .modal {
+      background: #fff; border-radius: 18px; width: 100%; max-width: 520px;
+      max-height: 86vh; overflow: auto; padding: 24px; box-shadow: 0 24px 60px rgba(0, 0, 0, .25);
+    }
+    .modal h3 { font-size: 17px; margin-bottom: 16px; }
+    .modal .modal-ops { display: flex; gap: 10px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">AI</span> 学习助手</div>
+  <nav class="nav-links">
+    <a href="home.html">概览</a>
+    <a href="summary.html">学习总结</a>
+    <a href="upload.html">上传错题</a>
+    <a href="questions.html">错题本</a>
+    <a href="ai.html">AI 助手</a>
+    <a href="categories.html" class="active">分类管理</a>
+    <a href="settings.html">设置</a>
+  </nav>
+  <div class="user-area">
+    <div class="avatar" data-username>U</div>
+    <span data-username>同学</span>
+    <button class="btn btn-sm btn-ghost" onclick="logout()">退出</button>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <h1>分类管理</h1>
+      <p class="sub">学科和知识点都能自由定义：直接输入新学科名即可创建，识图遇到新学科时会先询问你</p>
+    </div>
+    <a class="btn" href="questions.html">查看错题本</a>
+  </div>
+
+  <div class="grid grid-4" style="margin-bottom:18px">
+    <div class="stat accent">
+      <div class="label">学科</div>
+      <div class="value" id="stat-subjects">0</div>
+      <div class="icon">📚</div>
+    </div>
+    <div class="stat">
+      <div class="label">知识点</div>
+      <div class="value" id="stat-cats">0</div>
+      <div class="icon">🗂️</div>
+    </div>
+    <div class="stat">
+      <div class="label">错题总数</div>
+      <div class="value" id="stat-questions">0</div>
+      <div class="icon">📝</div>
+    </div>
+    <div class="stat">
+      <div class="label">未被使用的知识点</div>
+      <div class="value" id="stat-unused">0</div>
+      <div class="icon">🫧</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card" style="align-self:start">
+      <div class="card-title"><h3>新建学科 / 知识点</h3><span class="hint">学科支持自由输入</span></div>
+      <div class="msg" id="msg"></div>
+      <form id="cat-form" autocomplete="off">
+        <div class="field">
+          <label>所属学科 <span class="req">*</span></label>
+          <input type="text" id="subject-input" list="subject-options" maxlength="20"
+                 placeholder="输入或选择学科，例如：数学 / 生物" required>
+          <datalist id="subject-options"></datalist>
+          <div class="hint" id="subject-tip" style="margin-top:6px">
+            输入已有学科会直接复用；输入新名称会新建学科
+          </div>
+        </div>
+        <div class="field">
+          <label>知识点名称 <span class="req">*</span></label>
+          <input type="text" id="cat-name" maxlength="80" placeholder="例如：导数的几何意义" required>
+        </div>
+        <div class="field">
+          <label>上级知识点</label>
+          <select id="cat-parent"><option value="0">无（一级知识点）</option></select>
+        </div>
+        <div class="field">
+          <label>知识点说明</label>
+          <input type="text" id="cat-desc" maxlength="255" placeholder="选填，描述该知识点的考查范围">
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" id="cat-btn">保存</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <h3>学科与知识点</h3>
+        <span class="hint" id="cat-count"></span>
+      </div>
+      <div class="subject-tabs" id="subject-tabs"></div>
+      <div id="cat-list"><div class="empty">加载中…</div></div>
+    </div>
+  </div>
+</main>
+
+<div class="modal-mask" id="modal-mask">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  (function () {
+    let tree = [];
+    let activeSubject = 0;   // 0 = 全部学科
+    const msg = document.getElementById('msg');
+    const subjectInput = document.getElementById('subject-input');
+    const parentSelect = document.getElementById('cat-parent');
+
+    init();
+
+    async function init() {
+      try {
+        await guard();
+        await loadTree();
+      } catch (e) { /* 已跳转 */ }
+
+      subjectInput.addEventListener('input', updateSubjectTip);
+      document.getElementById('cat-form').addEventListener('submit', submitForm);
+    }
+
+    async function loadTree() {
+      const res = await Api.get('api/categoryTree.action');
+      tree = res.data || [];
+      renderStats();
+      renderSubjectOptions();
+      renderTabs();
+      renderList();
+      updateSubjectTip();
+    }
+
+    function allCategories() {
+      const out = [];
+      tree.forEach(function (s) {
+        flatten(s.categories, out, s);
+      });
+      return out;
+    }
+
+    function flatten(list, out, subject) {
+      (list || []).forEach(function (c) {
+        out.push({ id: c.id, name: c.name, description: c.description, parentId: c.parentId,
+          questionCount: c.questionCount, subjectId: subject.id, subjectName: subject.name });
+        flatten(c.children, out, subject);
+      });
+    }
+
+    function renderStats() {
+      const cats = allCategories();
+      let questions = 0;
+      let unused = 0;
+      tree.forEach(function (s) { questions += (s.questionCount || 0); });
+      cats.forEach(function (c) { if (!c.questionCount) unused++; });
+      document.getElementById('stat-subjects').textContent = tree.length;
+      document.getElementById('stat-cats').textContent = cats.length;
+      document.getElementById('stat-questions').textContent = questions;
+      document.getElementById('stat-unused').textContent = unused;
+    }
+
+    function renderSubjectOptions() {
+      document.getElementById('subject-options').innerHTML = tree.map(function (s) {
+        return '<option value="' + escapeHtml(s.name) + '">' + (s.categoryCount || 0) + ' 个知识点</option>';
+      }).join('');
+    }
+
+    function findSubject(name) {
+      const n = (name || '').trim();
+      if (!n) return null;
+      let loose = null;
+      for (const s of tree) {
+        if (s.name.toLowerCase() === n.toLowerCase()) return s;
+        if (!loose && (s.name.includes(n) || n.includes(s.name))) loose = s;
+      }
+      return loose;
+    }
+
+    function updateSubjectTip() {
+      const v = subjectInput.value.trim();
+      const tip = document.getElementById('subject-tip');
+      if (!v) {
+        tip.textContent = '输入已有学科会直接复用；输入新名称会新建学科';
+        tip.style.color = 'var(--ink-3)';
+      } else {
+        const hit = findSubject(v);
+        if (hit) {
+          tip.textContent = '将使用已有学科「' + hit.name + '」';
+          tip.style.color = 'var(--ok)';
+        } else {
+          tip.textContent = '将新建学科「' + v + '」';
+          tip.style.color = 'var(--brand)';
+        }
+      }
+      syncParentOptions(v);
+    }
+
+    function syncParentOptions(subjectText) {
+      const txt = subjectText == null ? subjectInput.value : subjectText;
+      const subject = findSubject(txt) || tree.find(function (s) { return s.id === activeSubject; });
+      const cats = subject ? allCategories().filter(function (c) { return c.subjectId === subject.id; }) : [];
+      parentSelect.innerHTML = '<option value="0">无（一级知识点）</option>' + cats.map(function (c) {
+        return '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>';
+      }).join('');
+    }
+
+    function renderTabs() {
+      const box = document.getElementById('subject-tabs');
+      const items = [{ id: 0, name: '全部', count: allCategories().length }].concat(tree.map(function (s) {
+        return { id: s.id, name: s.name, count: (s.categoryCount || 0) };
+      }));
+      box.innerHTML = items.map(function (s) {
+        return '<button type="button" class="' + (s.id === activeSubject ? 'active' : '') + '" data-sid="' + s.id + '">'
+          + escapeHtml(s.name) + ' · ' + s.count + '</button>';
+      }).join('');
+      box.querySelectorAll('button').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          activeSubject = Number(btn.dataset.sid);
+          renderTabs();
+          renderList();
+          syncParentOptions();
+        });
+      });
+    }
+
+    function renderList() {
+      const box = document.getElementById('cat-list');
+      const subjects = activeSubject ? tree.filter(function (s) { return s.id === activeSubject; }) : tree;
+      const totalCats = allCategories().length;
+      document.getElementById('cat-count').textContent = tree.length + ' 个学科 · ' + totalCats + ' 个知识点';
+
+      if (!subjects.length) {
+        box.innerHTML = '<div class="empty"><div class="big">🗂️</div>还没有学科，先在左侧输入学科名创建吧</div>';
+        return;
+      }
+
+      box.innerHTML = subjects.map(function (s) {
+        const cats = allCategories().filter(function (c) { return c.subjectId === s.id; });
+        const body = cats.length
+          ? '<div class="cat-list">' + cats.map(function (c) {
+              const parent = cats.find(function (p) { return p.id === c.parentId; });
+              return '<div class="cat-item">'
+                + '<div><div class="name">' + escapeHtml(c.name)
+                + (parent ? '<span class="parent-mark">隶属：' + escapeHtml(parent.name) + '</span>' : '')
+                + '</div>'
+                + '<div class="desc">' + (escapeHtml(c.description) || '暂无说明') + '</div></div>'
+                + '<div class="right"><span class="tag gray">' + c.questionCount + ' 题</span>'
+                + '<button class="btn btn-sm" data-edit="' + c.id + '">编辑</button>'
+                + '<button class="btn btn-sm btn-danger" data-cid="' + c.id + '">删除</button></div>'
+                + '</div>';
+            }).join('') + '</div>'
+          : '<div class="hint" style="padding:6px 2px">该学科还没有知识点</div>';
+
+        return '<div class="subject-block">'
+          + '<div class="subject-head">'
+          + '<div><span class="sname">' + escapeHtml(s.name) + '</span>'
+          + ' <span class="tag gray">' + cats.length + ' 个知识点</span>'
+          + ' <span class="tag">' + (s.questionCount || 0) + ' 题</span></div>'
+          + '<div class="ops">'
+          + '<button class="btn btn-sm" data-rename="' + s.id + '">重命名学科</button>'
+          + '<button class="btn btn-sm btn-danger" data-del-subject="' + s.id + '">删除学科</button>'
+          + '</div></div>'
+          + body + '</div>';
+      }).join('');
+
+      box.querySelectorAll('[data-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function () { openEditCategory(Number(btn.dataset.edit)); });
+      });
+      box.querySelectorAll('[data-cid]').forEach(function (btn) {
+        btn.addEventListener('click', function () { removeCategory(Number(btn.dataset.cid)); });
+      });
+      box.querySelectorAll('[data-rename]').forEach(function (btn) {
+        btn.addEventListener('click', function () { openRenameSubject(Number(btn.dataset.rename)); });
+      });
+      box.querySelectorAll('[data-del-subject]').forEach(function (btn) {
+        btn.addEventListener('click', function () { removeSubject(Number(btn.dataset.delSubject)); });
+      });
+    }
+
+    function showMsg(text, type) {
+      msg.textContent = text;
+      msg.className = 'msg show ' + type;
+    }
+    function hideMsg() { msg.className = 'msg'; }
+
+    async function submitForm(e) {
+      e.preventDefault();
+      hideMsg();
+      const subjectText = subjectInput.value.trim();
+      const catName = document.getElementById('cat-name').value.trim();
+      const desc = document.getElementById('cat-desc').value.trim();
+      const parentId = parentSelect.value || '0';
+      if (!subjectText) { showMsg('请输入所属学科', 'error'); return; }
+      if (!catName) { showMsg('请输入知识点名称', 'error'); return; }
+
+      const btn = document.getElementById('cat-btn');
+      btn.disabled = true;
+      btn.textContent = '保存中…';
+      try {
+        let subject = findSubject(subjectText);
+        let createdSubject = false;
+        if (!subject) {
+          const res = await Api.post('api/createSubject.action', { name: subjectText });
+          subject = { id: res.data.id, name: res.data.name };
+          createdSubject = !res.data.existed;
+        }
+        await Api.post('api/createCategory.action', {
+          subjectId: subject.id, name: catName, description: desc, parentId: parentId
+        });
+        toast(createdSubject ? '已新建学科「' + subject.name + '」并添加知识点' : '知识点已添加到「' + subject.name + '」', 'success');
+        document.getElementById('cat-name').value = '';
+        document.getElementById('cat-desc').value = '';
+        activeSubject = subject.id;
+        await loadTree();
+        renderTabs();
+        renderList();
+      } catch (err) {
+        showMsg(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '保存';
+      }
+    }
+
+    /* ---------- 弹窗：编辑知识点 / 重命名学科 ---------- */
+    const mask = document.getElementById('modal-mask');
+    const modal = document.getElementById('modal');
+
+    function closeModal() { mask.classList.remove('show'); }
+    mask.addEventListener('click', function (e) { if (e.target === mask) closeModal(); });
+
+    function openEditCategory(id) {
+      const cat = allCategories().find(function (c) { return c.id === id; });
+      if (!cat) return;
+      const siblings = allCategories().filter(function (c) {
+        return c.subjectId === cat.subjectId && c.id !== cat.id;
+      });
+      modal.innerHTML = '<h3>编辑知识点</h3>'
+        + '<div class="field"><label>所属学科</label>'
+        + '<input type="text" value="' + escapeHtml(cat.subjectName) + '" disabled></div>'
+        + '<div class="field"><label>知识点名称</label>'
+        + '<input type="text" id="edit-name" maxlength="80" value="' + escapeHtml(cat.name) + '"></div>'
+        + '<div class="field"><label>上级知识点</label>'
+        + '<select id="edit-parent"><option value="0">无（一级知识点）</option>'
+        + siblings.map(function (c) {
+            return '<option value="' + c.id + '"' + (c.id === cat.parentId ? ' selected' : '') + '>'
+              + escapeHtml(c.name) + '</option>';
+          }).join('') + '</select></div>'
+        + '<div class="field"><label>知识点说明</label>'
+        + '<input type="text" id="edit-desc" maxlength="255" value="' + escapeHtml(cat.description || '') + '"></div>'
+        + '<div class="modal-ops">'
+        + '<button class="btn btn-primary" type="button" id="edit-save">保存修改</button>'
+        + '<button class="btn" type="button" id="edit-cancel">取消</button></div>';
+      mask.classList.add('show');
+      document.getElementById('edit-cancel').addEventListener('click', closeModal);
+      document.getElementById('edit-save').addEventListener('click', async function () {
+        const name = document.getElementById('edit-name').value.trim();
+        if (!name) { toast('知识点名称不能为空', 'error'); return; }
+        this.disabled = true;
+        try {
+          await Api.post('api/updateCategory.action', {
+            id: cat.id, name: name,
+            description: document.getElementById('edit-desc').value.trim(),
+            parentId: document.getElementById('edit-parent').value
+          });
+          toast('知识点已更新', 'success');
+          closeModal();
+          await loadTree();
+        } catch (err) {
+          toast(err.message, 'error');
+        } finally {
+          this.disabled = false;
+        }
+      });
+    }
+
+    function openRenameSubject(id) {
+      const subject = tree.find(function (s) { return s.id === id; });
+      if (!subject) return;
+      modal.innerHTML = '<h3>重命名学科</h3>'
+        + '<div class="field"><label>学科名称</label>'
+        + '<input type="text" id="rename-input" maxlength="20" value="' + escapeHtml(subject.name) + '"></div>'
+        + '<div class="hint">改名后该学科下的 ' + (subject.categoryCount || 0) + ' 个知识点与 '
+        + (subject.questionCount || 0) + ' 道错题会一并归到新名称下</div>'
+        + '<div class="modal-ops">'
+        + '<button class="btn btn-primary" type="button" id="rename-save">保存</button>'
+        + '<button class="btn" type="button" id="rename-cancel">取消</button></div>';
+      mask.classList.add('show');
+      document.getElementById('rename-cancel').addEventListener('click', closeModal);
+      document.getElementById('rename-save').addEventListener('click', async function () {
+        const name = document.getElementById('rename-input').value.trim();
+        if (!name) { toast('学科名称不能为空', 'error'); return; }
+        this.disabled = true;
+        try {
+          await Api.post('api/updateSubject.action', { id: id, name: name });
+          toast('学科已重命名', 'success');
+          closeModal();
+          await loadTree();
+        } catch (err) {
+          toast(err.message, 'error');
+        } finally {
+          this.disabled = false;
+        }
+      });
+    }
+
+    async function removeSubject(id) {
+      const subject = tree.find(function (s) { return s.id === id; });
+      if (!subject) return;
+      if (!confirm('确定删除学科「' + subject.name + '」吗？\n学科下还有知识点或错题时无法删除。')) return;
+      try {
+        await Api.post('api/deleteSubject.action', { id: id });
+        toast('学科已删除', 'success');
+        if (activeSubject === id) activeSubject = 0;
+        await loadTree();
+        renderTabs();
+        renderList();
+      } catch (e) {
+        toast(e.message, 'error');
+      }
+    }
+
+    async function removeCategory(id) {
+      if (!confirm('确定删除该知识点吗？')) return;
+      try {
+        await Api.post('api/deleteCategory.action', { id: id });
+        toast('已删除', 'success');
+        await loadTree();
+      } catch (e) {
+        toast(e.message, 'error');
+      }
+    }
+  })();
+</script>
+</body>
+</html>

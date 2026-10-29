@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 助手 · AI 学习助手</title>
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .scene-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+    .chat-frame { width: 100%; height: calc(100vh - 268px); min-height: 480px; border: 0; display: block; border-radius: var(--radius); background: #fff; }
+    .scene-tabs button {
+      padding: 10px 8px; border: 1px solid var(--line); border-radius: 11px; background: #fff;
+      font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer; transition: .18s;
+    }
+    .scene-tabs button.active { background: var(--brand-soft); border-color: #c7c9f5; color: var(--brand); }
+    .scene-tabs button small { display: block; font-weight: 400; color: var(--ink-3); font-size: 11px; margin-top: 2px; }
+
+    .out {
+      min-height: 320px; max-height: 520px; overflow: auto; white-space: pre-wrap;
+      line-height: 1.85; color: var(--ink); font-size: 14px;
+      background: #fbfbff; border: 1px solid var(--line); border-radius: 12px; padding: 18px;
+    }
+    .out .placeholder { color: var(--ink-3); }
+
+    .ai-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+      background: #f2f3f9; color: var(--ink-2); font-size: 12px; }
+    .chip.ok { background: #e9f9f1; color: #067647; }
+    .chip.warn { background: #fff5e6; color: #b54708; }
+    .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .loading { display: inline-flex; gap: 4px; align-items: center; }
+    .loading i { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); animation: bounce 1s infinite; }
+    .loading i:nth-child(2) { animation-delay: .15s; }
+    .loading i:nth-child(3) { animation-delay: .3s; }
+    @keyframes bounce { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+
+    .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .presets button {
+      padding: 6px 11px; border-radius: 999px; border: 1px dashed #d5d8e8; background: #fff;
+      color: var(--ink-2); font-size: 12px; cursor: pointer; font-family: inherit;
+    }
+    .presets button:hover { border-color: var(--brand); color: var(--brand); }
+    .history-item { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
+    .history-item:last-child { border-bottom: none; }
+
+    .mini-drop {
+      border: 2px dashed #cfd4ea; border-radius: 12px; background: #fbfbff; min-height: 156px;
+      display: grid; place-items: center; text-align: center; padding: 14px; cursor: pointer;
+      transition: .18s; position: relative; overflow: hidden; color: var(--ink-2); font-size: 13px;
+    }
+    .mini-drop:hover, .mini-drop.drag { border-color: var(--brand); background: var(--brand-soft); }
+    .mini-drop .big { font-size: 24px; font-weight: 700; color: var(--brand); margin-bottom: 4px; }
+    .mini-drop .hint { color: var(--ink-3); font-size: 12px; margin-top: 4px; }
+    .mini-drop img { max-width: 100%; max-height: 240px; border-radius: 10px; display: block; }
+    .mini-drop .clear {
+      position: absolute; top: 8px; right: 8px; background: rgba(22, 24, 43, .62); color: #fff;
+      border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 13px; line-height: 1;
+    }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">AI</span> 学习助手</div>
+  <nav class="nav-links">
+    <a href="home.html">概览</a>
+    <a href="summary.html">学习总结</a>
+    <a href="upload.html">上传错题</a>
+    <a href="questions.html">错题本</a>
+    <a href="ai.html" class="active">AI 助手</a>
+    <a href="categories.html">分类管理</a>
+    <a href="settings.html">设置</a>
+  </nav>
+  <div class="user-area">
+    <div class="avatar" data-username>U</div>
+    <span data-username>同学</span>
+    <button class="btn btn-sm btn-ghost" onclick="logout()">退出</button>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <h1>AI 助手</h1>
+      <p class="sub">AI 对话、错题解析、学习建议与图片问答；模型默认本机 Ollama，可在设置页切换云端</p>
+    </div>
+    <div class="ai-meta" style="margin:0">
+      <span class="chip" id="status-chip"><span class="dot"></span> 检测模型中…</span>
+    </div>
+  </div>
+
+  <div id="view-chat">
+    <iframe id="chat-frame" class="chat-frame" title="AI 对话" src="about:blank"></iframe>
+  </div>
+
+  <div id="view-tool" style="display:none">
+  <div class="grid grid-2">
+    <div class="card" style="align-self:start">
+      <div class="scene-tabs">
+        <button type="button" class="active" data-scene="chat">AI 对话<small>连续追问</small></button>
+        <button type="button" data-scene="explain">错题解析<small>讲透一道错题</small></button>
+        <button type="button" data-scene="advice">学习建议<small>基于错题统计</small></button>
+        <button type="button" data-scene="image">图片问答<small>拍照上传问 AI</small></button>
+      </div>
+
+      <div id="panel-explain">
+        <div class="field">
+          <label>选择要解析的错题</label>
+          <select id="question-select"><option value="">加载中…</option></select>
+        </div>
+        <button class="btn btn-primary btn-block" type="button" id="run-explain">生成 AI 解析</button>
+        <p style="color:var(--ink-3);font-size:12px;margin-top:10px">
+          会结合学科、知识点、你的作答与错因记录生成讲解，结果可一键写回该题解析。
+        </p>
+      </div>
+
+      <div id="panel-image" style="display:none">
+        <div class="field">
+          <label>上传图片（题目、笔记、图表都可以）</label>
+          <div class="mini-drop" id="image-drop">
+            <input type="file" id="image-file" accept="image/*" hidden>
+            <div id="image-empty">
+              <div class="big">图</div>
+              <div>点击或拖拽图片到这里</div>
+              <div class="hint">支持 jpg / png / webp，10MB 以内</div>
+            </div>
+            <img id="image-preview" alt="待识别的图片" style="display:none">
+            <button class="clear" type="button" id="image-clear" title="移除图片" style="display:none">×</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>想问什么（可不填）</label>
+          <input type="text" id="image-question" maxlength="500" placeholder="例如：这道题的第二步为什么要这样变形？">
+        </div>
+        <button class="btn btn-primary btn-block" type="button" id="run-image">让 AI 看懂这张图</button>
+        <p style="color:var(--ink-3);font-size:12px;margin-top:10px">
+          图片交给多模态模型 qwen2.5vl 识别；为节省显存，识别前会自动卸载文字模型，用完再切回。
+        </p>
+      </div>
+
+      <div id="panel-advice" style="display:none">
+        <div class="field">
+          <label>统计范围</label>
+          <input type="text" value="基于我的全部错题数据" disabled>
+        </div>
+        <button class="btn btn-primary btn-block" type="button" id="run-advice">生成复习建议</button>
+        <p style="color:var(--ink-3);font-size:12px;margin-top:10px">
+          会分析学科分布与高频知识点，输出本周复习计划与习惯建议。
+        </p>
+      </div>
+
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <h3>AI 输出</h3>
+        <span class="hint" id="run-meta"></span>
+      </div>
+      <div class="out" id="output"><span class="placeholder">选择场景后点击按钮，AI 的讲解会显示在这里。</span></div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn btn-sm" type="button" id="copy-btn" disabled>复制内容</button>
+        <button class="btn btn-sm" type="button" id="save-btn" disabled>写入该题解析</button>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+  <section class="card" style="margin-top:18px;display:none" id="history-card">
+    <div class="card-title"><h3>最近调用</h3><span class="hint">来自 t_ai_log</span></div>
+    <div id="history"><div class="empty" style="padding:20px">暂无记录</div></div>
+  </section>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/ai-health.js"></script>
+<script>
+  (function () {
+    let scene = 'chat';
+    let lastText = '';
+    let lastQuestionId = null;
+    let busy = false;
+
+    const output = document.getElementById('output');
+    const metaEl = document.getElementById('run-meta');
+    const copyBtn = document.getElementById('copy-btn');
+    const saveBtn = document.getElementById('save-btn');
+
+    let imageFile = null;
+    let imagePath = '';
+
+    const imageDrop = document.getElementById('image-drop');
+    const imageInput = document.getElementById('image-file');
+    const imagePreview = document.getElementById('image-preview');
+    const imageEmpty = document.getElementById('image-empty');
+    const imageClear = document.getElementById('image-clear');
+    const imageQuestion = document.getElementById('image-question');
+
+    init();
+
+    const chatFrame = document.getElementById('chat-frame');
+    const viewChat = document.getElementById('view-chat');
+    const viewTool = document.getElementById('view-tool');
+    const historyCard = document.getElementById('history-card');
+
+    async function init() {
+      try {
+        await guard();
+        await loadStatus();
+        checkAiHealth();
+        await loadQuestions();
+        initScene();
+      } catch (e) { return; }
+    }
+
+    /** 进入页面自动探测一次模型是否还在响应，不阻塞页面渲染 */
+    function checkAiHealth() {
+      AiHealth.check().then(function (h) {
+        if (!h) return;
+        const chip = document.getElementById('status-chip');
+        if (!chip) return;
+        chip.className = 'chip ' + ((h.ok && h.visionReady !== false) ? 'ok' : 'warn');
+        let txt = escapeHtml(h.providerLabel || h.provider) + ' · 文字 ' + escapeHtml(h.model);
+        if (h.visionModel) txt += ' · 识图 ' + escapeHtml(h.visionModel);
+        if (h.busy) txt += ' · 使用中';
+        else if (!h.ok) txt += ' · 无响应';
+        else if (h.visionReady === false) txt += ' · 识图未就绪';
+        chip.innerHTML = '<span class="dot"></span> ' + txt;
+        chip.title = h.busy ? '模型正在处理请求，本次跳过检测'
+          : (h.ok ? (h.tip || ('模型响应正常 · ' + h.latencyMs + ' ms')) : (h.reason || ''));
+      });
+    }
+
+    function initScene() {
+      const params = new URLSearchParams(location.search);
+      const qid = params.get('id');
+      const want = params.get('scene');
+      if (qid || want === 'explain') setScene('explain');
+      else if (want === 'advice') setScene('advice');
+      else if (want === 'image') setScene('image');
+      else setScene('chat');
+      if (qid) {
+        const sel = document.getElementById('question-select');
+        if (sel && Array.prototype.some.call(sel.options, o => o.value === qid)) sel.value = qid;
+      }
+    }
+
+    function setScene(s) {
+      scene = s;
+      document.querySelectorAll('.scene-tabs button').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.scene === scene);
+      });
+      viewChat.style.display = scene === 'chat' ? 'block' : 'none';
+      viewTool.style.display = scene === 'chat' ? 'none' : 'block';
+      historyCard.style.display = scene === 'chat' ? 'none' : 'block';
+      document.getElementById('panel-explain').style.display = scene === 'explain' ? 'block' : 'none';
+      document.getElementById('panel-advice').style.display = scene === 'advice' ? 'block' : 'none';
+      document.getElementById('panel-image').style.display = scene === 'image' ? 'block' : 'none';
+      metaEl.textContent = '';
+      if (scene === 'chat' && chatFrame.dataset.loaded !== '1') {
+        chatFrame.src = 'chat.html?embed=1';
+        chatFrame.dataset.loaded = '1';
+      }
+    }
+
+    async function loadStatus() {
+      try {
+        const res = await Api.get('api/aiStatus.action');
+        const d = res.data;
+        const chip = document.getElementById('status-chip');
+        chip.className = 'chip ' + ((d.fallback || d.modelReady === false || d.visionReady === false) ? 'warn' : 'ok');
+        chip.innerHTML = '<span class="dot"></span> ' + escapeHtml(d.providerLabel) + ' · 文字 ' + escapeHtml(d.model)
+          + (d.visionModel ? ' · 识图 ' + escapeHtml(d.visionModel) : '');
+        chip.title = d.tip || '';
+        renderHistory(d.history || []);
+      } catch (e) {
+        document.getElementById('status-chip').textContent = 'AI 状态未知';
+      }
+    }
+
+    async function loadQuestions() {
+      const select = document.getElementById('question-select');
+      try {
+        const res = await Api.get('api/questions.action', { page: 1, size: 50 });
+        const list = res.data.list || [];
+        if (!list.length) {
+          select.innerHTML = '<option value="">还没有错题，先去上传一道</option>';
+          return;
+        }
+        select.innerHTML = list.map(function (q) {
+          const cat = q.categoryName ? ' · ' + q.categoryName : '';
+          return '<option value="' + q.id + '">' + escapeHtml(q.subjectName) + cat + ' · ' + escapeHtml(q.title) + '</option>';
+        }).join('');
+        const preset = new URLSearchParams(location.search).get('id');
+        if (preset) select.value = preset;
+      } catch (e) {
+        select.innerHTML = '<option value="">加载失败：' + escapeHtml(e.message) + '</option>';
+      }
+    }
+
+    document.querySelectorAll('.scene-tabs button').forEach(function (btn) {
+      btn.addEventListener('click', function () { setScene(btn.dataset.scene); });
+    });
+
+    document.getElementById('run-explain').addEventListener('click', async function () {
+      const qid = document.getElementById('question-select').value;
+      if (!qid) { toast('请先选择一道错题', 'error'); return; }
+      lastQuestionId = qid;
+      await run('api/aiExplain.action', { questionId: qid });
+    });
+
+    document.getElementById('run-advice').addEventListener('click', async function () {
+      lastQuestionId = null;
+      await run('api/aiAdvice.action', {});
+    });
+
+    /* ---------- 图片问答 ---------- */
+    imageDrop.addEventListener('click', function (e) {
+      if (e.target === imageInput) return;
+      imageInput.click();
+    });
+    imageInput.addEventListener('change', function () {
+      chooseImage(imageInput.files && imageInput.files[0]);
+      imageInput.value = '';
+    });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      imageDrop.addEventListener(ev, function (e) { e.preventDefault(); imageDrop.classList.add('drag'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      imageDrop.addEventListener(ev, function (e) { e.preventDefault(); imageDrop.classList.remove('drag'); });
+    });
+    imageDrop.addEventListener('drop', function (e) {
+      chooseImage(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+    });
+    imageClear.addEventListener('click', function (e) {
+      e.stopPropagation();
+      resetImage();
+    });
+    document.getElementById('run-image').addEventListener('click', submitImage);
+
+    function chooseImage(file) {
+      if (!file) return;
+      if (!/^image\//.test(file.type)) { toast('请选择图片文件', 'error'); return; }
+      if (file.size > 10 * 1024 * 1024) { toast('图片不能超过 10MB', 'error'); return; }
+      imageFile = file;
+      imagePath = '';
+      imagePreview.src = URL.createObjectURL(file);
+      imagePreview.style.display = 'block';
+      imageEmpty.style.display = 'none';
+      imageClear.style.display = 'block';
+    }
+
+    function resetImage() {
+      imageFile = null;
+      imagePath = '';
+      imagePreview.removeAttribute('src');
+      imagePreview.style.display = 'none';
+      imageEmpty.style.display = 'block';
+      imageClear.style.display = 'none';
+    }
+
+    function renderImageAnswer(src, text) {
+      output.innerHTML = '';
+      if (src) {
+        const img = document.createElement('img');
+        img.src = Api.url(src);
+        img.alt = '上传的图片';
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '260px';
+        img.style.borderRadius = '10px';
+        img.style.display = 'block';
+        img.style.marginBottom = '12px';
+        output.appendChild(img);
+      }
+      const box = document.createElement('div');
+      box.textContent = text || '（模型没有返回内容，换一张更清晰的图片试试）';
+      output.appendChild(box);
+    }
+
+    async function submitImage() {
+      if (busy) return;
+      if (!imageFile && !imagePath) {
+        toast('请先选择一张图片', 'error');
+        return;
+      }
+      busy = true;
+      lastText = '';
+      lastQuestionId = null;
+      copyBtn.disabled = true;
+      saveBtn.disabled = true;
+      metaEl.textContent = '';
+      output.innerHTML = '<span class="loading"><i></i><i></i><i></i></span>'
+        + ' <span style="color:var(--ink-3)">正在上传图片并调用识图模型，首次识别需加载模型，约 10-60 秒…</span>';
+      const start = Date.now();
+      try {
+        if (!imagePath) {
+          const up = await Api.upload('api/upload.action', imageFile, 'image');
+          imagePath = (up.data && up.data.url) || '';
+          if (!imagePath) throw new Error('图片上传失败，请重试');
+        }
+        const res = await Api.post('api/aiAskImage.action', {
+          imagePath: imagePath,
+          question: imageQuestion.value.trim()
+        });
+        const d = res.data || {};
+        lastText = d.text || '';
+        renderImageAnswer(d.imagePath || imagePath, lastText);
+        copyBtn.disabled = !lastText;
+        metaEl.textContent = (d.providerLabel || '') + ' · ' + (d.model || '')
+          + ' · ' + (d.elapsedMs || (Date.now() - start)) + ' ms';
+        if (d.fallback) {
+          toast('识图模型不可用，本次用本地规则回答', 'error');
+        } else {
+          toast('AI 已看懂这张图', 'success');
+        }
+        loadStatus();
+      } catch (e) {
+        output.innerHTML = '<span style="color:var(--danger)">' + escapeHtml(e.message) + '</span>';
+        toast(e.message, 'error');
+      } finally {
+        busy = false;
+      }
+    }
+
+    async function run(path, payload) {
+      if (busy) return;
+      busy = true;
+      lastText = '';
+      copyBtn.disabled = true;
+      saveBtn.disabled = true;
+      output.innerHTML = '<span class="loading"><i></i><i></i><i></i></span> <span style="color:var(--ink-3)">本地 7B 模型正在思考，首次调用需加载模型，约 10-60 秒…</span>';
+      metaEl.textContent = '';
+      const start = Date.now();
+      try {
+        const res = await Api.post(path, payload);
+        const d = res.data;
+        lastText = d.text || '';
+        output.textContent = lastText;
+        copyBtn.disabled = !lastText;
+        saveBtn.disabled = !(d.questionId && lastText && !d.fallback);
+        saveBtn.dataset.qid = d.questionId || '';
+        metaEl.textContent = d.providerLabel + ' · ' + d.model + ' · ' + (d.elapsedMs || (Date.now() - start)) + ' ms';
+        if (d.fallback) {
+          toast('当前为本地规则模式，配置模型后可获得真正的 AI 讲解', 'error');
+        }
+        loadStatus();
+      } catch (e) {
+        output.innerHTML = '<span style="color:var(--danger)">' + escapeHtml(e.message) + '</span>';
+        toast(e.message, 'error');
+      } finally {
+        busy = false;
+      }
+    }
+
+    copyBtn.addEventListener('click', async function () {
+      if (!lastText) return;
+      try {
+        await navigator.clipboard.writeText(lastText);
+        toast('已复制', 'success');
+      } catch (e) {
+        toast('复制失败，请手动选择文本', 'error');
+      }
+    });
+
+    saveBtn.addEventListener('click', async function () {
+      const qid = saveBtn.dataset.qid || lastQuestionId;
+      if (!qid || !lastText) return;
+      saveBtn.disabled = true;
+      try {
+        await Api.post('api/aiSaveAnalysis.action', { questionId: qid, analysis: lastText });
+        toast('已写入该题解析', 'success');
+      } catch (e) {
+        toast(e.message, 'error');
+        saveBtn.disabled = false;
+      }
+    });
+
+    function renderHistory(list) {
+      const box = document.getElementById('history');
+      if (!list.length) {
+        box.innerHTML = '<div class="empty" style="padding:20px">暂无调用记录</div>';
+        return;
+      }
+      const names = { explain: '错题解析', advice: '学习建议', ask: '自由提问', chat: 'AI 对话', classify: '自动分类', 'image-ask': '图片问答' };
+      box.innerHTML = list.map(function (row) {
+        return '<div class="history-item"><span>' + (names[row.scene] || row.scene)
+          + ' · ' + escapeHtml(row.model) + '</span>'
+          + '<span>' + (row.elapsedMs ? row.elapsedMs + ' ms' : '本地') + ' · ' + formatDate(String(row.createdAt)) + '</span></div>';
+      }).join('');
+    }
+  })();
+</script>
+</body>
+</html>

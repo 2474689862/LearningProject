@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 对话 · AI 学习助手</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    // 被 AI 助手页以 iframe 嵌入时（?embed=1），隐藏本站顶栏与页头，只保留聊天区
+    if (location.search.indexOf('embed=1') >= 0) document.documentElement.className = 'embed';
+  </script>
+  <style>
+    html.embed .topbar, html.embed .page-head { display: none !important; }
+    html.embed .page { padding: 0 !important; max-width: none !important; }
+    html.embed body { background: #fff; }
+    html.embed .chat-side, html.embed .chat-main { height: calc(100vh - 10px); min-height: 380px; }
+    html.embed .chat-side { max-height: none; }
+    .chat-shell { display: grid; grid-template-columns: 250px 1fr; gap: 18px; align-items: start; }
+
+    /* 左侧会话列表 */
+    .chat-side {
+      background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 14px; align-self: stretch;
+      display: flex; flex-direction: column; max-height: calc(100vh - 150px);
+    }
+    .chat-side .side-label {
+      margin: 16px 0 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3);
+    }
+    #session-list { flex: 1; overflow: auto; margin: 0 -4px; }
+    .session-item {
+      display: flex; align-items: center; gap: 6px; padding: 9px 10px; border-radius: 10px;
+      font-size: 13px; color: var(--ink-2); cursor: pointer; transition: .16s;
+    }
+    .session-item:hover { background: #f7f8fd; }
+    .session-item.active { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+    .session-item .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .session-item .x {
+      border: none; background: transparent; color: var(--ink-3); cursor: pointer;
+      font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 6px; opacity: 0;
+    }
+    .session-item:hover .x { opacity: 1; }
+    .session-item .x:hover { background: #ffeceb; color: var(--danger); }
+    .side-foot { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+
+    /* 右侧对话区 */
+    .chat-main {
+      background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+      box-shadow: var(--shadow); display: flex; flex-direction: column;
+      height: calc(100vh - 150px); min-height: 480px;
+    }
+    .chat-head {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      padding: 16px 20px; border-bottom: 1px solid var(--line);
+    }
+    .chat-head h2 { font-size: 16px; }
+    .chat-head .hint { color: var(--ink-3); font-size: 12px; margin-top: 3px; }
+    .chat-body { flex: 1; overflow: auto; padding: 20px; background: #fbfbff; }
+    .empty-chat { text-align: center; color: var(--ink-3); padding: 40px 10px; font-size: 13px; }
+    .empty-chat .big { font-size: 34px; margin-bottom: 8px; }
+
+    .row-msg { display: flex; gap: 10px; margin-bottom: 18px; }
+    .row-msg.user { flex-direction: row-reverse; }
+    .avatar-dot {
+      width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; display: grid; place-items: center;
+      font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    }
+    .row-msg.user .avatar-dot { background: #dfe2f1; color: var(--ink-2); }
+    .bubble {
+      max-width: min(680px, 78%); padding: 11px 14px; border-radius: 13px; font-size: 14px;
+      line-height: 1.75; white-space: pre-wrap; word-break: break-word;
+    }
+    .row-msg.assistant .bubble { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+    .row-msg.user .bubble { background: var(--brand); color: #fff; }
+    .meta { font-size: 11px; color: var(--ink-3); margin-top: 6px; }
+
+    .chat-suggest { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 20px 12px; }
+    .chat-suggest button {
+      padding: 6px 12px; border-radius: 999px; border: 1px dashed #d5d8e8; background: #fff;
+      color: var(--ink-2); font-size: 12px; cursor: pointer; font-family: inherit;
+    }
+    .chat-suggest button:hover { border-color: var(--brand); color: var(--brand); }
+
+    .chat-input {
+      display: flex; gap: 10px; align-items: flex-end; padding: 14px 20px;
+      border-top: 1px solid var(--line); background: #fff; border-radius: 0 0 var(--radius) var(--radius);
+    }
+    .chat-input textarea {
+      flex: 1; resize: none; max-height: 132px; padding: 11px 13px; font-family: inherit;
+      font-size: 14px; line-height: 1.6; border: 1px solid var(--line); border-radius: 12px;
+      background: #fbfbff; color: var(--ink); outline: none;
+    }
+    .chat-input textarea:focus { border-color: #c7c9f5; background: #fff; box-shadow: 0 0 0 3px rgba(79, 70, 229, .08); }
+    .chat-tip { padding: 0 20px 12px; font-size: 11px; color: var(--ink-3); }
+
+    .typing { display: inline-flex; gap: 5px; align-items: center; }
+    .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); animation: bnc 1s infinite; }
+    .typing i:nth-child(2) { animation-delay: .15s; }
+    .typing i:nth-child(3) { animation-delay: .3s; }
+    @keyframes bnc { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+
+    .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+      background: #f2f3f9; color: var(--ink-2); font-size: 12px; }
+    .chip.ok { background: #e9f9f1; color: #067647; }
+    .chip.warn { background: #fff5e6; color: #b54708; }
+    .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    @media (max-width: 860px) {
+      .chat-shell { grid-template-columns: 1fr; }
+      .chat-side { max-height: 220px; }
+      .chat-main { height: 70vh; }
+    }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">AI</span> 学习助手</div>
+  <nav class="nav-links">
+    <a href="home.html">概览</a>
+    <a href="summary.html">学习总结</a>
+    <a href="upload.html">上传错题</a>
+    <a href="questions.html">错题本</a>
+    <a href="ai.html">AI 助手</a>
+    <a href="categories.html">分类管理</a>
+    <a href="settings.html">设置</a>
+  </nav>
+  <div class="user-area">
+    <div class="avatar" data-username>U</div>
+    <span data-username>同学</span>
+    <button class="btn btn-sm btn-ghost" onclick="logout()">退出</button>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <h1>AI 对话</h1>
+      <p class="sub">多轮追问、逐步讲透，支持上下文承接与本地保存</p>
+    </div>
+    <a class="btn" href="ai.html?scene=explain">错题解析 / 学习建议</a>
+  </div>
+
+  <div class="chat-shell">
+    <aside class="chat-side">
+      <button class="btn btn-primary btn-block" type="button" id="new-chat">＋ 新对话</button>
+      <div class="side-label">历史对话</div>
+      <div id="session-list"></div>
+      <div class="side-foot">
+        <span class="chip" id="status-chip"><span class="dot"></span> 检测模型中…</span>
+      </div>
+    </aside>
+
+    <section class="chat-main">
+      <div class="chat-head">
+        <div>
+          <h2 id="chat-title">新对话</h2>
+          <p class="hint" id="chat-sub">可以问我知识点、解题思路、复习规划</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" type="button" id="export-btn">导出</button>
+          <button class="btn btn-sm btn-danger" type="button" id="clear-btn">清空</button>
+        </div>
+      </div>
+
+      <div class="chat-body" id="chat-body"></div>
+
+      <div class="chat-suggest" id="suggest">
+        <button type="button" data-q="帮我梳理一下函数单调性的判断步骤">函数单调性判断</button>
+        <button type="button" data-q="导数为零的点一定是极值点吗？举个例子说明">导数与极值</button>
+        <button type="button" data-q="英语完形填空总丢分，给我 3 个可执行的训练方法">完形填空提分</button>
+        <button type="button" data-q="帮我制定一份为期一周的错题复习计划">一周复习计划</button>
+      </div>
+
+      <div class="chat-input">
+        <textarea id="input" rows="1" maxlength="1000" placeholder="输入问题，Enter 发送，Shift + Enter 换行"></textarea>
+        <button class="btn btn-primary" type="button" id="send-btn">发送</button>
+      </div>
+      <div class="chat-tip">本地 7B 模型推理中，回答通常需要 5-30 秒；内容仅供学习参考。</div>
+    </section>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/ai-health.js"></script>
+<script>
+  (function () {
+    const STORE_KEY = 'aistudy_chat_v1';
+    const MAX_HISTORY = 6;
+    let sessions = [];
+    let currentId = null;
+    let sending = false;
+
+    const bodyEl = document.getElementById('chat-body');
+    const listEl = document.getElementById('session-list');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send-btn');
+    const suggestEl = document.getElementById('suggest');
+
+    init();
+
+    async function init() {
+      try {
+        await guard();
+        load();
+        if (window.self === window.top) AiHealth.check();
+        if (!sessions.length) createSession();
+        renderAll();
+        loadStatus();
+      } catch (e) { /* 已跳转登录 */ }
+    }
+
+    async function loadStatus() {
+      const chip = document.getElementById('status-chip');
+      try {
+        const res = await Api.get('api/aiStatus.action');
+        const d = res.data;
+        chip.className = 'chip ' + ((d.fallback || d.modelReady === false) ? 'warn' : 'ok');
+        chip.innerHTML = '<span class="dot"></span> ' + escapeHtml(d.providerLabel) + ' · ' + escapeHtml(d.model);
+        chip.title = d.tip || '';
+      } catch (e) {
+        chip.textContent = 'AI 状态未知';
+      }
+    }
+
+    /* ---------- 会话存取 ---------- */
+    function load() {
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        sessions = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(sessions)) sessions = [];
+      } catch (e) { sessions = []; }
+      const last = localStorage.getItem(STORE_KEY + '_current');
+      currentId = last && sessions.some(s => s.id === last) ? last : (sessions[0] ? sessions[0].id : null);
+    }
+
+    function persist() {
+      try {
+        localStorage.setItem(STORE_KEY, JSON.stringify(sessions.slice(0, 20)));
+        if (currentId) localStorage.setItem(STORE_KEY + '_current', currentId);
+      } catch (e) { /* 存储写满时忽略 */ }
+    }
+
+    function current() {
+      return sessions.find(s => s.id === currentId) || null;
+    }
+
+    function createSession() {
+      const s = { id: 's' + Date.now(), title: '新对话', createdAt: Date.now(), messages: [] };
+      sessions.unshift(s);
+      currentId = s.id;
+      persist();
+      renderAll();
+      return s;
+    }
+
+    /* ---------- 渲染 ---------- */
+    function renderAll() {
+      renderSessions();
+      renderChat();
+    }
+
+    function renderSessions() {
+      listEl.innerHTML = sessions.map(function (s) {
+        return '<div class="session-item' + (s.id === currentId ? ' active' : '') + '" data-id="' + s.id + '">'
+          + '<span class="t">' + escapeHtml(s.title || '新对话') + '</span>'
+          + '<button class="x" type="button" data-del="' + s.id + '" title="删除">×</button></div>';
+      }).join('') || '<div style="color:var(--ink-3);font-size:12px;padding:8px 4px">还没有对话</div>';
+    }
+
+    function renderChat() {
+      const s = current();
+      document.getElementById('chat-title').textContent = s ? (s.title || '新对话') : '新对话';
+      const count = s ? s.messages.length : 0;
+      document.getElementById('chat-sub').textContent = count
+        ? '共 ' + count + ' 条消息 · 上下文自动承接'
+        : '可以问我知识点、解题思路、复习规划';
+      suggestEl.style.display = count ? 'none' : 'flex';
+
+      if (!s || !s.messages.length) {
+        bodyEl.innerHTML = '<div class="empty-chat"><div class="big">💬</div>'
+          + '还没有消息，先问一个学习问题吧<br>支持连续追问，AI 会记住上下文</div>';
+        return;
+      }
+      bodyEl.innerHTML = s.messages.map(function (m) {
+        return '<div class="row-msg ' + m.role + '">'
+          + '<div class="avatar-dot">' + (m.role === 'user' ? '我' : 'AI') + '</div>'
+          + '<div><div class="bubble">' + format(m.content) + '</div>'
+          + (m.meta ? '<div class="meta">' + escapeHtml(m.meta) + '</div>' : '')
+          + '</div></div>';
+      }).join('');
+      bodyEl.scrollTop = bodyEl.scrollHeight;
+    }
+
+    function format(text) {
+      return escapeHtml(text || '').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    }
+
+    /* ---------- 发送 ---------- */
+    async function send(text) {
+      const content = (text || '').trim();
+      if (!content || sending) return;
+      let s = current();
+      if (!s) s = createSession();
+
+      s.messages.push({ role: 'user', content: content });
+      if (s.messages.filter(m => m.role === 'user').length === 1) {
+        s.title = content.length > 18 ? content.slice(0, 18) + '…' : content;
+      }
+      persist();
+      renderAll();
+      inputEl.value = '';
+      autoGrow();
+
+      const history = s.messages.slice(0, -1).slice(-MAX_HISTORY).map(function (m) {
+        return { role: m.role, content: m.content.slice(0, 400) };
+      });
+
+      sending = true;
+      sendBtn.disabled = true;
+      const holder = document.createElement('div');
+      holder.className = 'row-msg assistant';
+      holder.innerHTML = '<div class="avatar-dot">AI</div>'
+        + '<div><div class="bubble"><span class="typing"><i></i><i></i><i></i></span>'
+        + ' <span style="color:var(--ink-3);font-size:13px">正在思考…</span></div></div>';
+      bodyEl.appendChild(holder);
+      bodyEl.scrollTop = bodyEl.scrollHeight;
+
+      const start = Date.now();
+      try {
+        const res = await Api.post('api/aiChat.action', {
+          message: content,
+          history: JSON.stringify(history)
+        });
+        const d = res.data;
+        s.messages.push({
+          role: 'assistant',
+          content: d.text || '',
+          meta: d.providerLabel + ' · ' + d.model + ' · ' + (d.elapsedMs || (Date.now() - start)) + ' ms'
+        });
+        if (d.fallback) toast('当前为本地规则回答，配置模型可获得真正的讲解', 'error');
+      } catch (e) {
+        s.messages.push({ role: 'assistant', content: '调用失败：' + e.message, meta: '失败' });
+        toast(e.message, 'error');
+      } finally {
+        sending = false;
+        sendBtn.disabled = false;
+        persist();
+        renderAll();
+        inputEl.focus();
+      }
+    }
+
+    /* ---------- 事件 ---------- */
+    sendBtn.addEventListener('click', () => send(inputEl.value));
+
+    inputEl.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        send(inputEl.value);
+      }
+    });
+
+    function autoGrow() {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 132) + 'px';
+    }
+    inputEl.addEventListener('input', autoGrow);
+
+    suggestEl.addEventListener('click', function (e) {
+      const btn = e.target.closest('button[data-q]');
+      if (btn) send(btn.dataset.q);
+    });
+
+    listEl.addEventListener('click', function (e) {
+      const del = e.target.closest('[data-del]');
+      if (del) {
+        e.stopPropagation();
+        const id = del.dataset.del;
+        sessions = sessions.filter(s => s.id !== id);
+        if (currentId === id) currentId = sessions[0] ? sessions[0].id : null;
+        if (!sessions.length) createSession();
+        persist();
+        renderAll();
+        return;
+      }
+      const item = e.target.closest('.session-item');
+      if (item) {
+        currentId = item.dataset.id;
+        persist();
+        renderAll();
+      }
+    });
+
+    document.getElementById('new-chat').addEventListener('click', function () {
+      createSession();
+      inputEl.focus();
+    });
+
+    document.getElementById('clear-btn').addEventListener('click', function () {
+      const s = current();
+      if (!s || !s.messages.length) return;
+      if (!confirm('清空当前对话内容？')) return;
+      s.messages = [];
+      s.title = '新对话';
+      persist();
+      renderAll();
+    });
+
+    document.getElementById('export-btn').addEventListener('click', function () {
+      const s = current();
+      if (!s || !s.messages.length) { toast('当前对话还没有内容', 'error'); return; }
+      const lines = ['# ' + (s.title || 'AI 对话'), ''];
+      s.messages.forEach(function (m) {
+        lines.push('## ' + (m.role === 'user' ? '我' : 'AI'));
+        lines.push(m.content);
+        if (m.meta) lines.push('> ' + m.meta);
+        lines.push('');
+      });
+      const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'ai-chat-' + new Date().toISOString().slice(0, 10) + '.md';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+    });
+  })();
+</script>
+</body>
+</html>

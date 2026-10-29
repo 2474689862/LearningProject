@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE struts PUBLIC
+        "-//Apache Software Foundation//DTD Struts Configuration 6.5//EN"
+        "http://struts.apache.org/dtds/struts-6.5.dtd">
+<struts>
+    <constant name="struts.devMode" value="false"/>
+    <constant name="struts.i18n.encoding" value="UTF-8"/>
+    <constant name="struts.action.extension" value="action"/>
+    <constant name="struts.enable.DynamicMethodInvocation" value="false"/>
+    <constant name="struts.ui.theme" value="simple"/>
+    <!-- Struts 6.7+ 默认只接受带 @StrutsParameter 注解的 setter，老代码未加注解，这里关掉以保持 2.5 的行为 -->
+    <constant name="struts.parameters.requireAnnotations" value="false"/>
+    <constant name="struts.multipart.maxSize" value="20971520"/>
+
+    <!-- 公开接口：登录 / 注册 -->
+    <package name="pub" namespace="/auth" extends="struts-default">
+        <action name="login" class="com.aistudy.action.AuthAction" method="login"/>
+        <action name="register" class="com.aistudy.action.AuthAction" method="register"/>
+        <action name="logout" class="com.aistudy.action.AuthAction" method="logout"/>
+        <action name="me" class="com.aistudy.action.AuthAction" method="me"/>
+    </package>
+
+    <!-- 业务接口：需要登录 -->
+    <package name="api" namespace="/api" extends="struts-default">
+        <interceptors>
+            <interceptor name="loginCheck" class="com.aistudy.interceptor.LoginInterceptor"/>
+            <interceptor-stack name="secureStack">
+                <interceptor-ref name="defaultStack"/>
+                <interceptor-ref name="loginCheck"/>
+            </interceptor-stack>
+        </interceptors>
+        <default-interceptor-ref name="secureStack"/>
+
+        <action name="stats" class="com.aistudy.action.QuestionAction" method="stats"/>
+
+        <!-- 图片上传 -->
+        <action name="upload" class="com.aistudy.action.UploadAction" method="image"/>
+
+        <!-- 学科 / 分类 -->
+        <action name="subjects" class="com.aistudy.action.CatalogAction" method="subjects"/>
+        <action name="categoryTree" class="com.aistudy.action.CatalogAction" method="tree"/>
+        <action name="categories" class="com.aistudy.action.CatalogAction" method="list"/>
+        <action name="createCategory" class="com.aistudy.action.CatalogAction" method="create"/>
+        <action name="updateCategory" class="com.aistudy.action.CatalogAction" method="updateCategory"/>
+        <action name="deleteCategory" class="com.aistudy.action.CatalogAction" method="delete"/>
+        <action name="createSubject" class="com.aistudy.action.CatalogAction" method="createSubject"/>
+        <action name="updateSubject" class="com.aistudy.action.CatalogAction" method="updateSubject"/>
+        <action name="deleteSubject" class="com.aistudy.action.CatalogAction" method="deleteSubject"/>
+        <action name="quickCreateCatalog" class="com.aistudy.action.CatalogAction" method="quickCreate"/>
+
+        <!-- AI 能力 -->
+        <action name="aiStatus" class="com.aistudy.action.AiAction" method="status"/>
+        <action name="aiHealth" class="com.aistudy.action.AiAction" method="health"/>
+        <action name="aiExplain" class="com.aistudy.action.AiAction" method="explain"/>
+        <action name="aiAdvice" class="com.aistudy.action.AiAction" method="advice"/>
+        <action name="aiAsk" class="com.aistudy.action.AiAction" method="ask"/>
+        <action name="aiSaveAnalysis" class="com.aistudy.action.AiAction" method="saveAnalysis"/>
+        <action name="aiChat" class="com.aistudy.action.AiAction" method="chat"/>
+    <action name="aiAskImage" class="com.aistudy.action.AiAction" method="askImage"/>
+        <action name="aiClassify" class="com.aistudy.action.AiAction" method="classify"/>
+        <action name="aiRecognize" class="com.aistudy.action.AiAction" method="recognize"/>
+        <action name="aiVerify" class="com.aistudy.action.AiAction" method="verify"/>
+        <action name="aiAnalyze" class="com.aistudy.action.AiAction" method="analyze"/>
+        <action name="aiSummary" class="com.aistudy.action.AiAction" method="summary"/>
+        <action name="summaryLatest" class="com.aistudy.action.AiAction" method="summaryLatest"/>
+
+        <!-- 设置页：全局配置 + 诊断 -->
+        <action name="settingsGet" class="com.aistudy.action.SettingsAction" method="get"/>
+        <action name="settingsSave" class="com.aistudy.action.SettingsAction" method="save"/>
+        <action name="settingsTestAi" class="com.aistudy.action.SettingsAction" method="testAi"/>
+        <action name="settingsDiagnose" class="com.aistudy.action.SettingsAction" method="diagnose"/>
+        <action name="settingsReset" class="com.aistudy.action.SettingsAction" method="reset"/>
+
+        <!-- 账号：昵称 / 改密 -->
+        <action name="updateProfile" class="com.aistudy.action.AuthAction" method="updateProfile"/>
+        <action name="changePassword" class="com.aistudy.action.AuthAction" method="changePassword"/>
+
+        <!-- 题目 -->
+        <action name="questions" class="com.aistudy.action.QuestionAction" method="list"/>
+        <action name="question" class="com.aistudy.action.QuestionAction" method="detail"/>
+        <action name="createQuestion" class="com.aistudy.action.QuestionAction" method="create"/>
+        <action name="updateQuestion" class="com.aistudy.action.QuestionAction" method="update"/>
+        <action name="deleteQuestion" class="com.aistudy.action.QuestionAction" method="delete"/>
+    </package>
+</struts>

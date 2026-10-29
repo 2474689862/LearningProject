@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>概览 · AI 学习助手</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">AI</span> 学习助手</div>
+  <nav class="nav-links">
+    <a href="home.html" class="active">概览</a>
+    <a href="summary.html">学习总结</a>
+    <a href="upload.html">上传错题</a>
+    <a href="questions.html">错题本</a>
+    <a href="ai.html">AI 助手</a>
+    <a href="categories.html">分类管理</a>
+    <a href="settings.html">设置</a>
+  </nav>
+  <div class="user-area">
+    <div class="avatar" data-username>U</div>
+    <span data-username>同学</span>
+    <button class="btn btn-sm btn-ghost" onclick="logout()">退出</button>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <h1>学习概览</h1>
+      <p class="sub">把错题变成进步的台阶，今天也要加油 🎯</p>
+    </div>
+    <div style="display:flex;gap:10px">
+      <a class="btn" href="questions.html">查看错题本</a>
+      <a class="btn" href="ai.html?scene=chat">问 AI</a>
+      <a class="btn btn-primary" href="upload.html">＋ 上传错题</a>
+    </div>
+  </div>
+
+  <section class="grid grid-4" style="margin-bottom:18px">
+    <div class="stat accent">
+      <div class="label">错题总数</div>
+      <div class="value" id="stat-total">-</div>
+      <div class="icon">📚</div>
+    </div>
+    <div class="stat">
+      <div class="label">今日新增</div>
+      <div class="value" id="stat-today">-</div>
+      <div class="icon">✍️</div>
+    </div>
+    <div class="stat">
+      <div class="label">上传图片</div>
+      <div class="value" id="stat-uploads">-</div>
+      <div class="icon">🖼️</div>
+    </div>
+    <div class="stat">
+      <div class="label">知识点分类</div>
+      <div class="value" id="stat-categories">-</div>
+      <div class="icon">🗂️</div>
+    </div>
+  </section>
+
+  <section class="grid grid-2">
+    <div class="card">
+      <div class="card-title">
+        <h3>学科错题分布</h3>
+        <span class="hint">按已录入题目统计</span>
+      </div>
+      <div id="subject-stats"><div class="empty">加载中…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <h3>最近录入</h3>
+        <a href="questions.html" style="font-size:13px">全部 →</a>
+      </div>
+      <div id="recent"><div class="empty">加载中…</div></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:18px">
+    <div class="card-title"><h3>快速开始</h3><span class="hint">三步建立你的错题本</span></div>
+    <div class="grid grid-4">
+      <div>
+        <div class="tag">第 1 步</div>
+        <h4 style="margin:8px 0 4px">拍照上传</h4>
+        <p style="color:var(--ink-3);font-size:13px">在「上传错题」页选择或拖入题目图片</p>
+      </div>
+      <div>
+        <div class="tag">第 2 步</div>
+        <h4 style="margin:8px 0 4px">选择分类</h4>
+        <p style="color:var(--ink-3);font-size:13px">按学科 + 知识点归类，便于复习检索</p>
+      </div>
+      <div>
+        <div class="tag">第 3 步</div>
+        <h4 style="margin:8px 0 4px">记录错因</h4>
+        <p style="color:var(--ink-3);font-size:13px">写下作答与解析，形成可复用的经验</p>
+      </div>
+      <div>
+        <div class="tag">进阶</div>
+        <h4 style="margin:8px 0 4px">分类管理</h4>
+        <p style="color:var(--ink-3);font-size:13px">在「分类管理」中扩展自己的知识点体系</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+  (async function () {
+    try {
+      await guard();
+      const res = await Api.get('api/stats.action');
+      const d = res.data;
+      document.getElementById('stat-total').textContent = d.totalQuestions;
+      document.getElementById('stat-today').textContent = d.todayQuestions;
+      document.getElementById('stat-uploads').textContent = d.totalUploads;
+      document.getElementById('stat-categories').textContent = d.totalCategories;
+
+      renderSubjectStats(d.subjectStats || []);
+      await renderRecent();
+    } catch (e) {
+      if (e.message && e.message !== '请先登录') toast(e.message, 'error');
+    }
+  })();
+
+  function renderSubjectStats(list) {
+    const box = document.getElementById('subject-stats');
+    if (!list.length) {
+      box.innerHTML = '<div class="empty">暂无数据</div>';
+      return;
+    }
+    const max = Math.max.apply(null, list.map(i => i.count).concat([1]));
+    box.innerHTML = list.map(function (item) {
+      const pct = Math.round(item.count / max * 100);
+      return '<div style="margin-bottom:14px">'
+        + '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">'
+        + '<b>' + escapeHtml(item.name) + '</b><span style="color:var(--ink-3)">' + item.count + ' 道</span></div>'
+        + '<div style="height:8px;background:#f1f2f8;border-radius:99px;overflow:hidden">'
+        + '<div style="height:100%;width:' + pct + '%;border-radius:99px;background:linear-gradient(90deg,#4f46e5,#7c3aed)"></div>'
+        + '</div></div>';
+    }).join('');
+  }
+
+  async function renderRecent() {
+    const box = document.getElementById('recent');
+    const res = await Api.get('api/questions.action', { page: 1, size: 5 });
+    const list = res.data.list || [];
+    if (!list.length) {
+      box.innerHTML = '<div class="empty"><div class="big">🗒️</div>还没有错题，去上传第一道吧</div>';
+      return;
+    }
+    box.innerHTML = '<table><thead><tr><th>题目</th><th>学科</th><th>知识点</th><th>时间</th></tr></thead><tbody>'
+      + list.map(function (q) {
+        return '<tr>'
+          + '<td><a href="questions.html?id=' + q.id + '"><b>' + escapeHtml(q.title) + '</b></a></td>'
+          + '<td><span class="tag">' + escapeHtml(q.subjectName) + '</span></td>'
+          + '<td style="color:var(--ink-2)">' + (escapeHtml(q.categoryName) || '<span style="color:var(--ink-3)">未分类</span>') + '</td>'
+          + '<td style="color:var(--ink-3)">' + formatDate(q.createdAt) + '</td>'
+          + '</tr>';
+      }).join('') + '</tbody></table>';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# ============ 数据库连接配置（模板）============
+# 使用方法：复制本文件为同目录下的 db.properties，再按本机 MySQL 实际情况修改。
+#   Windows:  copy db.properties.example db.properties
+#   macOS/Linux: cp db.properties.example db.properties
+#
+# db.properties 已被 .gitignore 忽略，不会被提交，可以安全地写入本地密码。
+#
+# 也可以用环境变量覆盖（优先级高于本文件）：
+#   DB_URL / DB_USER / DB_PASSWORD
+#
+# 注意：应用启动时会自动执行 CREATE DATABASE，使用的账号需要建库权限；
+#       如果没有，请先手动建库（库名与下面 jdbc.url 中的库名保持一致）：
+#       CREATE DATABASE ai_study DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+
+jdbc.driver=com.mysql.cj.jdbc.Driver
+
+jdbc.url=jdbc:mysql://127.0.0.1:3306/ai_study?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false&allowMultiQueries=true
+
+jdbc.username=root
+
+# 本机 MySQL 密码；没有密码就留空
+jdbc.password=

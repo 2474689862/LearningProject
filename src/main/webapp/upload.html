@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>上传错题 · AI 学习助手</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="vendor/katex/katex.min.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">AI</span> 学习助手</div>
+  <nav class="nav-links">
+    <a href="home.html">概览</a>
+    <a href="summary.html">学习总结</a>
+    <a href="upload.html" class="active">上传错题</a>
+    <a href="questions.html">错题本</a>
+    <a href="ai.html">AI 助手</a>
+    <a href="categories.html">分类管理</a>
+    <a href="settings.html">设置</a>
+  </nav>
+  <div class="user-area">
+    <div class="avatar" data-username>U</div>
+    <span data-username>同学</span>
+    <button class="btn btn-sm btn-ghost" onclick="logout()">退出</button>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <h1>上传错题</h1>
+      <p class="sub">上传题目图片，AI 读图后自动填写题干、学科、知识点与错因</p>
+    </div>
+    <a class="btn" href="questions.html">前往错题本</a>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-title"><h3>题目图片</h3><span class="hint">支持 jpg / png / gif / webp，≤ 10MB</span></div>
+      <div class="dropzone" id="dropzone">
+        <div id="dz-inner">
+          <div class="big">📷</div>
+          <b>点击选择，或把图片拖到这里</b>
+          <div class="hint">建议拍摄清晰、光线均匀的题目照片</div>
+        </div>
+      </div>
+      <input type="file" id="file-input" accept="image/*" style="display:none">
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn" type="button" id="pick-btn">选择图片</button>
+        <button class="btn btn-primary" type="button" id="ai-recognize" disabled>一键识别</button>
+        <button class="btn btn-ghost" type="button" id="reset-btn">清除</button>
+        <span id="upload-state" style="display:block;color:var(--ink-3);font-size:13px"></span>
+      </div>
+      <div class="hint" style="margin-top:8px">传图后会自动读图填表；也可随时点「一键识别」重新识别</div>
+
+      <div class="search-box">
+        <div class="search-head">
+          <label class="search-switch">
+            <input type="checkbox" id="search-enabled">
+            <span class="switch-track"></span>
+            <b>识别后联网校验</b>
+          </label>
+          <span class="hint" id="search-state-text">默认档 · 无需 Key</span>
+        </div>
+        <div class="search-opts">
+          <div class="tier-group">
+            <button type="button" class="tier-btn" data-tier="default">默认档</button>
+            <button type="button" class="tier-btn" data-tier="anysearch">AnySearch 档</button>
+          </div>
+          <div class="search-key hidden" id="search-key-wrap">
+            <input type="password" id="anysearch-key" maxlength="200" autocomplete="off"
+                   placeholder="AnySearch API Key（仅保存在本机浏览器）">
+            <button type="button" class="btn btn-sm btn-ghost" id="key-eye">显示</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="key-clear">清除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><h3>错题信息</h3><span class="hint">带 <span style="color:var(--danger)">*</span> 为必填</span></div>
+      <div class="msg" id="msg"></div>
+      <form id="q-form" autocomplete="off">
+        <div class="row">
+          <div class="field">
+            <label>学科 <span class="req">*</span></label>
+            <select id="subject" required><option value="">请选择学科</option></select>
+          </div>
+          <div class="field">
+            <label>知识点分类</label>
+            <select id="category"><option value="">未分类</option></select>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;margin:-4px 0 16px;flex-wrap:wrap">
+          <button class="btn btn-sm" type="button" id="ai-classify">按题干校正分类</button>
+          <span id="ai-hint-text" style="color:var(--ink-3);font-size:12px;flex:1;min-width:200px">
+            上传图片后，AI 会读图自动填写学科、知识点与难度
+          </span>
+        </div>
+
+        <div id="verify-panel" class="verify-panel"></div>
+
+        <div class="field">
+          <label>题目标题 <span class="req">*</span></label>
+          <input type="text" id="title" maxlength="200" placeholder="例如：函数单调性与导数综合题" required>
+        </div>
+
+        <div class="field">
+          <label>题干 / 关键信息</label>
+          <textarea id="content" rows="3" placeholder="AI 读图后自动填写，可手工修改"></textarea>
+          <div id="content-preview" class="latex-preview hidden"></div>
+        </div>
+
+        <div id="qtype-mount"></div>
+
+        <div id="raw-panel" class="raw-panel hidden">
+          <details>
+            <summary>原始转写（模型逐行读图结果，用来核对公式）</summary>
+            <textarea id="raw-text" rows="6" spellcheck="false"></textarea>
+            <div class="raw-actions">
+              <button class="btn btn-sm" type="button" id="raw-copy">复制</button>
+              <button class="btn btn-sm" type="button" id="raw-to-content">填入题干</button>
+              <span class="hint" id="raw-state"></span>
+            </div>
+          </details>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>难度</label>
+            <select id="difficulty">
+              <option value="1">简单</option>
+              <option value="2" selected>中等</option>
+              <option value="3">困难</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>题目来源</label>
+            <input type="text" id="source" placeholder="例如：2024 届高三第一次模拟考">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>错因分析</label>
+          <textarea id="analysis" rows="3" placeholder="例如：忽略定义域限制，导致单调区间判断错误"></textarea>
+        </div>
+
+        <button class="btn btn-primary btn-block" type="submit" id="save-btn">保存到错题本</button>
+      </form>
+    </div>
+  </div>
+</main>
+
+<script src="vendor/katex/katex.min.js"></script>
+<script src="vendor/katex/auto-render.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/latex.js"></script>
+<script src="js/qtype.js"></script>
+<script src="js/ai-health.js"></script>
+<script>
+  (function () {
+    let imagePath = '';
+    let uploading = false;
+    let recognizing = false;
+
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const stateEl = document.getElementById('upload-state');
+    const subjectEl = document.getElementById('subject');
+    const categoryEl = document.getElementById('category');
+    const msg = document.getElementById('msg');
+    const recognizeBtn = document.getElementById('ai-recognize');
+    const hintText = document.getElementById('ai-hint-text');
+    const titleEl = document.getElementById('title');
+    const contentEl = document.getElementById('content');
+    const difficultyEl = document.getElementById('difficulty');
+    const qtypeEl = document.getElementById('qtype-mount');
+    const contentPreview = document.getElementById('content-preview');
+    const rawPanel = document.getElementById('raw-panel');
+    const rawDetails = rawPanel.querySelector('details');
+    const rawTextEl = document.getElementById('raw-text');
+    const rawState = document.getElementById('raw-state');
+
+    /* ---------- 设置页里的本机偏好：默认学科 / 题型 / 难度 / 原始转写自动展开 ---------- */
+    const PREF = {
+      subject: 'aistudy-default-subject',
+      type: 'aistudy-default-type',
+      difficulty: 'aistudy-default-difficulty',
+      rawOpen: 'aistudy-raw-open'
+    };
+    const prefType = localStorage.getItem(PREF.type);
+    const initialType = QTypes.TYPES.some(function (t) { return t.key === prefType; })
+      ? prefType : 'choice';
+    QTypes.mount(qtypeEl, { type: initialType });
+
+    /* ---------- 联网校验设置：开关 / 档位 / Key 都存在本机浏览器 ---------- */
+    const searchEnabledEl = document.getElementById('search-enabled');
+    const searchStateText = document.getElementById('search-state-text');
+    const keyWrap = document.getElementById('search-key-wrap');
+    const keyEl = document.getElementById('anysearch-key');
+    const verifyPanel = document.getElementById('verify-panel');
+    const LS_KEY = { on: 'aistudy-search-on', tier: 'aistudy-search-tier', key: 'aistudy-anysearch-key' };
+
+    let searchTier = localStorage.getItem(LS_KEY.tier) === 'anysearch' ? 'anysearch' : 'default';
+    let verifySeq = 0;
+    searchEnabledEl.checked = localStorage.getItem(LS_KEY.on) !== '0';
+    keyEl.value = localStorage.getItem(LS_KEY.key) || '';
+    syncSearchUI();
+
+    function syncSearchUI() {
+      document.querySelectorAll('.tier-btn').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.tier === searchTier);
+      });
+      keyWrap.classList.toggle('hidden', searchTier !== 'anysearch');
+      if (!searchEnabledEl.checked) {
+        searchStateText.textContent = '已关闭 · 识别后不联网';
+      } else if (searchTier === 'anysearch') {
+        searchStateText.textContent = keyEl.value.trim() ? 'AnySearch 档 · 已填写 Key' : 'AnySearch 档 · 需要填写 Key';
+      } else {
+        searchStateText.textContent = '默认档 · 无需 Key';
+      }
+    }
+
+    searchEnabledEl.addEventListener('change', function () {
+      localStorage.setItem(LS_KEY.on, this.checked ? '1' : '0');
+      syncSearchUI();
+      if (!this.checked) {
+        verifySeq++;
+        verifyPanel.innerHTML = '';
+        verifyPanel.classList.remove('show');
+      }
+    });
+
+    document.querySelectorAll('.tier-btn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (searchTier === b.dataset.tier) return;
+        searchTier = b.dataset.tier;
+        localStorage.setItem(LS_KEY.tier, searchTier);
+        syncSearchUI();
+      });
+    });
+
+    keyEl.addEventListener('input', function () {
+      localStorage.setItem(LS_KEY.key, keyEl.value);
+      syncSearchUI();
+    });
+
+    document.getElementById('key-eye').addEventListener('click', function () {
+      const show = keyEl.type === 'password';
+      keyEl.type = show ? 'text' : 'password';
+      this.textContent = show ? '隐藏' : '显示';
+    });
+
+    document.getElementById('key-clear').addEventListener('click', function () {
+      keyEl.value = '';
+      localStorage.removeItem(LS_KEY.key);
+      syncSearchUI();
+    });
+
+    let tree = [];
+    let classifyPromise = null;
+    let lastClassifyText = '';
+    let autoFilled = false;   // 学科是否由 AI 填入
+
+    init();
+
+    async function init() {
+      try {
+        await guard();
+        const res = await Api.get('api/categoryTree.action');
+        AiHealth.check();
+        tree = res.data || [];
+        subjectEl.innerHTML = '<option value="">请选择学科</option>' + tree.map(function (s) {
+          return '<option value="' + s.id + '">' + escapeHtml(s.name) + '（' + s.questionCount + '）</option>';
+        }).join('');
+      } catch (e) { /* 已跳转登录 */ }
+
+      // 优先用地址栏指定的学科，其次用设置页里的默认学科
+      const presetSubject = new URLSearchParams(location.search).get('subjectId')
+        || localStorage.getItem(PREF.subject) || '';
+      if (presetSubject) {
+        subjectEl.value = presetSubject;
+        fillCategories();
+      }
+      const prefDifficulty = localStorage.getItem(PREF.difficulty);
+      if (prefDifficulty) difficultyEl.value = prefDifficulty;
+    }
+
+    subjectEl.addEventListener('change', fillCategories);
+    subjectEl.addEventListener('change', function () { autoFilled = false; });
+
+    function difficultyText(d) {
+      return d === 1 ? '简单' : d === 3 ? '困难' : '中等';
+    }
+
+    function fillCategories() {
+      const sid = Number(subjectEl.value);
+      const subject = tree.find(s => s.id === sid);
+      const cats = subject ? subject.categories : [];
+      categoryEl.innerHTML = '<option value="">未分类</option>' + cats.map(function (c) {
+        return '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>';
+      }).join('');
+    }
+
+    /* ---------- 按题干校正分类（文字微调） ---------- */
+    function aiClassify(force) {
+      if (classifyPromise) return classifyPromise;
+      if (!force && subjectEl.value && !autoFilled) return Promise.resolve();
+
+      const title = titleEl.value.trim();
+      const content = contentEl.value.trim();
+      const text = (title + ' ' + content).trim();
+      if (text.length < 4) {
+        if (force) toast('请先填写题目标题或题干', 'error');
+        return Promise.resolve();
+      }
+      if (!force && text === lastClassifyText) return Promise.resolve();
+
+      hintText.textContent = 'AI 正在按题干校正学科与知识点…';
+      classifyPromise = Api.post('api/aiClassify.action', { title: title, content: content })
+        .then(function (res) {
+          const d = res.data;
+          lastClassifyText = text;
+          if (!d.subjectId) {
+            hintText.textContent = 'AI 未能识别学科，请手动选择' + (d.reason ? '（' + d.reason + '）' : '');
+            return;
+          }
+          subjectEl.value = String(d.subjectId);
+          fillCategories();
+          if (d.categoryId) categoryEl.value = String(d.categoryId);
+          if (d.difficulty) difficultyEl.value = String(d.difficulty);
+          autoFilled = true;
+          hintText.textContent = 'AI 建议：' + d.subjectName
+            + (d.categoryName ? ' · ' + d.categoryName : '（未匹配到知识点）')
+            + ' · ' + difficultyText(d.difficulty)
+            + (d.fallback ? ' · 本地规则' : '')
+            + ' · ' + ((d.elapsedMs || 0) / 1000).toFixed(1) + 's，可手动修改';
+        }, function (err) {
+          hintText.textContent = 'AI 分类失败：' + err.message + '，请手动选择';
+          if (force) toast(err.message, 'error');
+        })
+        .finally(function () { classifyPromise = null; });
+      return classifyPromise;
+    }
+
+    document.getElementById('ai-classify').addEventListener('click', function () { aiClassify(true); });
+    titleEl.addEventListener('blur', function () { aiClassify(false); });
+    contentEl.addEventListener('blur', function () { aiClassify(false); });
+
+    /* ---------- 一键识别：图片交给模型，读图后填写整张表单 ---------- */
+    recognizeBtn.addEventListener('click', function () { recognize(); });
+
+    async function recognize() {
+      if (recognizing) return;
+      if (uploading) { toast('图片还在上传，请稍候', 'error'); return; }
+      if (!imagePath) { toast('请先上传题目图片', 'error'); return; }
+      recognizing = true;
+      recognizeBtn.disabled = true;
+      recognizeBtn.textContent = '识别中…';
+      stateEl.textContent = 'AI 正在读图填写表单…';
+      hintText.textContent = 'AI 正在识别图片中的题干、作答与错因，首次调用约需 20 秒…';
+      try {
+        const res = await Api.post('api/aiRecognize.action', { imagePath: imagePath });
+        applyRecognized(res.data);
+        toast('已按图片填写表单，请核对后保存', 'success');
+      } catch (err) {
+        stateEl.textContent = '识别失败';
+        hintText.textContent = 'AI 识图失败：' + err.message;
+        toast(err.message, 'error');
+      } finally {
+        recognizing = false;
+        recognizeBtn.disabled = !imagePath;
+        recognizeBtn.textContent = '一键识别';
+      }
+    }
+
+    /* ---------- 联网校验：识别完成后单独请求，可切档位重跑 ---------- */
+    function tierLabel() {
+      return searchTier === 'anysearch' ? 'AnySearch 档' : '默认档';
+    }
+
+    async function runVerify() {
+      const qt = QTypes.get(qtypeEl);
+      const title = titleEl.value.trim();
+      const content = contentEl.value.trim();
+      if (!title && !content) return;
+      if (searchTier === 'anysearch' && !keyEl.value.trim()) {
+        renderVerify({ status: 'unavailable', reason: 'AnySearch 档需要填写 API Key，也可以先切回默认档' });
+        return;
+      }
+
+      const seq = ++verifySeq;
+      verifyPanel.classList.add('show');
+      verifyPanel.innerHTML = '<div class="verify-loading">联网校验中…（' + tierLabel() + '）</div>';
+
+      const subjectName = subjectEl.value
+        ? subjectEl.options[subjectEl.selectedIndex].text.replace(/（\d+）$/, '')
+        : '';
+      try {
+        const res = await Api.post('api/aiVerify.action', {
+          title: title,
+          content: content,
+          type: qt.type,
+          options: qt.optionsArray.join(' | '),
+          correctAnswer: qt.correctAnswer,
+          subjectName: subjectName,
+          searchTier: searchTier,
+          anySearchKey: keyEl.value.trim()
+        });
+        if (seq !== verifySeq) return;
+        renderVerify((res.data && res.data.verify) || {});
+      } catch (err) {
+        if (seq !== verifySeq) return;
+        renderVerify({ status: 'unavailable', reason: err.message });
+      }
+    }
+
+    function renderVerify(v) {
+      v = v || {};
+      verifyPanel.classList.add('show');
+      const recheck = '<button class="btn btn-sm" type="button" data-recheck="1">重新校验</button>';
+      if (v.status !== 'ok') {
+        const head = v.status === 'no_result' ? '未检索到可参考的题目' : '本次未完成联网校验';
+        verifyPanel.innerHTML = '<div class="verify-empty"><div><b>' + head + '</b>'
+          + '<p>' + escapeHtml(v.reason || '识别结果不受影响，可人工核对后保存') + '</p></div>'
+          + recheck + '</div>';
+        bindRecheck();
+        return;
+      }
+
+      const level = v.level === 'high' ? { text: '可信度高', cls: 'high' }
+        : v.level === 'low' ? { text: '可信度低', cls: 'low' }
+        : { text: '可信度中', cls: 'medium' };
+      const pct = Math.round((v.confidence || 0) * 100);
+      const issues = (v.issues || []).map(function (it) {
+        return '<li><span class="issue-type">' + escapeHtml(it.typeLabel || it.type || '待核对') + '</span>'
+          + escapeHtml(it.detail || '') + '</li>';
+      }).join('');
+      const sources = v.sources || [];
+      const sourceItems = sources.map(function (s) {
+        return '<li><a href="' + escapeHtml(s.url) + '" target="_blank" rel="noopener">['
+          + escapeHtml(s.index) + '] ' + escapeHtml(s.title || s.url) + '</a></li>';
+      }).join('');
+
+      verifyPanel.innerHTML = '<div class="verify-head">'
+        + '<span class="verify-badge ' + level.cls + '">' + level.text + ' · ' + pct + '%</span>'
+        + '<span class="hint">' + escapeHtml(v.tierLabel || '') + ' · ' + escapeHtml(v.engine || '')
+        + (v.cached ? ' · 缓存' : '')
+        + ' · ' + ((v.elapsedMs || 0) / 1000).toFixed(1) + 's</span></div>'
+        + (v.reason ? '<p class="verify-reason">' + escapeHtml(v.reason) + '</p>' : '')
+        + (issues ? '<ul class="verify-issues">' + issues + '</ul>'
+            : '<p class="verify-ok">未发现明显的识别问题</p>')
+        + (v.suggestedAnswer ? '<div class="verify-answer"><label>建议标准答案（仅提示）</label>'
+            + '<p>' + escapeHtml(v.suggestedAnswer) + '</p>'
+            + '<button class="btn btn-sm btn-primary" type="button" data-adopt="1">采用</button></div>' : '')
+        + (v.suggestedCategory ? '<p class="verify-reason">建议知识点：' + escapeHtml(v.suggestedCategory) + '</p>' : '')
+        + (sourceItems ? '<details class="verify-sources"><summary>参考来源 ' + sources.length
+            + ' 条</summary><ol>' + sourceItems + '</ol></details>' : '')
+        + '<div class="verify-actions">' + recheck + '</div>';
+
+      bindRecheck();
+      const adopt = verifyPanel.querySelector('[data-adopt]');
+      if (adopt) {
+        adopt.addEventListener('click', function () { adoptAnswer(v.suggestedAnswer); });
+      }
+    }
+
+    function bindRecheck() {
+      const btn = verifyPanel.querySelector('[data-recheck]');
+      if (btn) btn.addEventListener('click', runVerify);
+    }
+
+    function adoptAnswer(text) {
+      const el = qtypeEl.querySelector('[data-role="correct"]');
+      if (!el) {
+        toast('请先选择题型', 'error');
+        return;
+      }
+      const raw = String(text || '').trim();
+      if (el.tagName === 'SELECT') {
+        const exact = Array.from(el.options).find(function (o) {
+          return o.value === raw || o.text.trim() === raw;
+        });
+        if (exact) {
+          el.value = exact.value;
+        } else {
+          const letter = raw.toUpperCase().charAt(0);
+          const byLetter = Array.from(el.options).find(function (o) { return o.value === letter; });
+          if (!byLetter) {
+            toast('建议答案与当前选项不匹配，请手动选择', 'error');
+            return;
+          }
+          el.value = byLetter.value;
+        }
+      } else {
+        el.value = raw;
+      }
+      toast('已填入建议答案，请核对', 'success');
+    }
+
+    function applyRecognized(d) {
+      if (!d) return;
+      if (d.title) titleEl.value = d.title;
+      if (d.content) contentEl.value = d.content;
+      // 题型模板整体回填：题型、选项、标准答案、我的作答
+      QTypes.setData(qtypeEl, {
+        type: d.type || 'essay',
+        options: d.options,
+        correctAnswer: d.correctAnswer,
+        answer: d.answer
+      });
+      if (d.analysis) document.getElementById('analysis').value = d.analysis;
+      if (d.source) document.getElementById('source').value = d.source;
+      if (d.difficulty) difficultyEl.value = String(d.difficulty);
+      if (d.subjectId) {
+        subjectEl.value = String(d.subjectId);
+        fillCategories();
+        if (d.categoryId) categoryEl.value = String(d.categoryId);
+        autoFilled = true;
+      }
+      // 原始转写：让用户能对照模型逐行读图的结果核对公式
+      if (d.rawText && String(d.rawText).trim()) {
+        rawTextEl.value = d.rawText;
+        rawPanel.classList.remove('hidden');
+        rawDetails.open = localStorage.getItem(PREF.rawOpen) === '1';
+      } else {
+        rawTextEl.value = '';
+        rawPanel.classList.add('hidden');
+      }
+      updateContentPreview();
+      if (d.needReview) {
+        showMsg('已转写题目文字，但结构化没完成：请展开「原始转写」手动补充题干与答案', 'warn');
+      }
+      lastClassifyText = (titleEl.value + ' ' + contentEl.value).trim();
+      const secs = ((d.elapsedMs || 0) / 1000).toFixed(1);
+      hintText.textContent = '图片识别：' + QTypes.label(d.type)
+        + ' · ' + (d.subjectName || '未识别学科')
+        + (d.categoryName ? ' · ' + d.categoryName : '')
+        + ' · ' + difficultyText(d.difficulty)
+        + (d.fallback ? ' · 本地规则' : (d.model ? ' · ' + d.model : ''))
+        + ' · ' + secs + 's，请核对后保存';
+      stateEl.textContent = '已按图片填写表单';
+      if (searchEnabledEl.checked) runVerify();
+    }
+
+    /* ---------- 公式预览与原始转写 ---------- */
+    function updateContentPreview() {
+      const text = contentEl.value;
+      if (!text.trim() || !Latex.looksLikeMath(text)) {
+        contentPreview.innerHTML = '';
+        contentPreview.classList.add('hidden');
+        return;
+      }
+      contentPreview.classList.remove('hidden');
+      Latex.renderIn(contentPreview, text);
+    }
+    contentEl.addEventListener('input', updateContentPreview);
+
+    document.getElementById('raw-copy').addEventListener('click', async function () {
+      const text = rawTextEl.value;
+      if (!text.trim()) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (e) {
+        rawTextEl.select();
+        document.execCommand('copy');
+      }
+      rawState.textContent = '已复制';
+      setTimeout(function () { rawState.textContent = ''; }, 1500);
+    });
+
+    document.getElementById('raw-to-content').addEventListener('click', function () {
+      const text = rawTextEl.value.trim();
+      if (!text) return;
+      contentEl.value = text;
+      updateContentPreview();
+      toast('已把转写文本填入题干', 'success');
+    });
+
+    /* ---------- 图片选择与上传 ---------- */
+    document.getElementById('pick-btn').addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', function () {
+      if (fileInput.files[0]) doUpload(fileInput.files[0]);
+    });
+
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      dropzone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        dropzone.classList.add('drag');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      dropzone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        dropzone.classList.remove('drag');
+      });
+    });
+    dropzone.addEventListener('drop', function (e) {
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) doUpload(file);
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', function () {
+      imagePath = '';
+      fileInput.value = '';
+      stateEl.textContent = '';
+      recognizeBtn.disabled = true;
+      hintText.textContent = '上传图片后，AI 会读图自动填写学科、知识点与难度';
+      verifySeq++;
+      verifyPanel.innerHTML = '';
+      verifyPanel.classList.remove('show');
+      rawTextEl.value = '';
+      rawPanel.classList.add('hidden');
+      contentPreview.innerHTML = '';
+      contentPreview.classList.add('hidden');
+      dropzone.innerHTML = '<div><div class="big">📷</div><b>点击选择，或把图片拖到这里</b>'
+        + '<div class="hint">建议拍摄清晰、光线均匀的题目照片</div></div>';
+    });
+
+    async function doUpload(file) {
+      if (!file.type.startsWith('image/')) {
+        toast('请选择图片文件', 'error');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast('图片不能超过 10MB', 'error');
+        return;
+      }
+      uploading = true;
+      stateEl.textContent = '上传中…';
+      const localUrl = URL.createObjectURL(file);
+      dropzone.innerHTML = '<img src="' + localUrl + '" alt="preview">';
+      let uploaded = false;
+      try {
+        const res = await Api.upload('api/upload.action', file, 'image');
+        imagePath = res.data.url;
+        stateEl.textContent = '上传成功 · ' + (res.data.size / 1024).toFixed(0) + ' KB';
+        recognizeBtn.disabled = false;
+        uploaded = true;
+        toast('图片已上传，AI 开始识别题目信息', 'success');
+      } catch (e) {
+        stateEl.textContent = '';
+        dropzone.innerHTML = '<div><div class="big">⚠️</div><b>上传失败</b><div class="hint">' + escapeHtml(e.message) + '</div></div>';
+        toast(e.message, 'error');
+      } finally {
+        uploading = false;
+        if (uploaded) recognize();
+      }
+    }
+
+    function showMsg(text, type) {
+      msg.textContent = text;
+      msg.className = 'msg show ' + type;
+    }
+    function hideMsg() { msg.className = 'msg'; }
+
+    document.getElementById('q-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      hideMsg();
+      if (uploading) {
+        showMsg('图片还在上传，请稍候', 'error');
+        return;
+      }
+      if (recognizing) {
+        showMsg('AI 正在按图片识别题目信息，请稍候再保存', 'error');
+        return;
+      }
+      if (!subjectEl.value) {
+        const btn0 = document.getElementById('save-btn');
+        btn0.disabled = true;
+        btn0.textContent = 'AI 正在分类…';
+        await aiClassify(true);
+        btn0.disabled = false;
+        btn0.textContent = '保存到错题本';
+      }
+      const qt = QTypes.get(qtypeEl);
+      const payload = {
+        subjectId: subjectEl.value,
+        categoryId: categoryEl.value,
+        title: titleEl.value.trim(),
+        content: contentEl.value.trim(),
+        type: qt.type,
+        options: qt.options,
+        correctAnswer: qt.correctAnswer,
+        answer: qt.answer,
+        analysis: document.getElementById('analysis').value.trim(),
+        source: document.getElementById('source').value.trim(),
+        difficulty: difficultyEl.value,
+        imagePath: imagePath
+      };
+      if (!payload.subjectId) { showMsg('请选择学科', 'error'); return; }
+      if (!payload.title) { showMsg('请填写题目标题', 'error'); return; }
+      if (qt.type === 'choice' && qt.optionsArray.length < 2) {
+        showMsg('选择题至少需要填写 2 个选项', 'error');
+        return;
+      }
+      if (!payload.imagePath && !payload.content) {
+        showMsg('请上传题目图片，或填写题干文字', 'error');
+        return;
+      }
+      const btn = document.getElementById('save-btn');
+      btn.disabled = true;
+      btn.textContent = '保存中…';
+      try {
+        await Api.post('api/createQuestion.action', payload);
+        toast('保存成功，正在打开错题本', 'success');
+        setTimeout(function () { location.href = 'questions.html'; }, 600);
+      } catch (err) {
+        showMsg(err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '保存到错题本';
+      }
+    });
+  })();
+</script>
+</body>
+</html>

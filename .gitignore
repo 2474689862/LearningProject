@@ -1,0 +1,38 @@
+# ---- 构建产物 ----
+target/
+out/
+*.class
+*.war
+*.ear
+
+# ---- IDE / 工具 ----
+.idea/
+*.iml
+.vscode/
+.trae/
+.trae-html-share-packages/
+.screenshots/
+.playwright-cli/
+
+# ---- 本地敏感配置（不要提交）----
+src/main/resources/db.properties
+
+# ---- 运行日志与调试残留 ----
+*.log
+*.err
+cookies.txt
+c2.txt
+body.txt
+b1.txt
+b2.txt
+bc.txt
+bf.txt
+test.png
+
+# ---- 用户上传的图片 ----
+src/main/webapp/uploads/*
+!src/main/webapp/uploads/.gitkeep
+
+# ---- 系统 ----
+Thumbs.db
+.DS_Store

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>设置 · AI 学习助手</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">AI</span> 学习助手</div>
+  <nav class="nav-links">
+    <a href="home.html">概览</a>
+    <a href="summary.html">学习总结</a>
+    <a href="upload.html">上传错题</a>
+    <a href="questions.html">错题本</a>
+    <a href="ai.html">AI 助手</a>
+    <a href="categories.html">分类管理</a>
+    <a href="settings.html" class="active">设置</a>
+  </nav>
+  <div class="user-area">
+    <div class="avatar" data-username>U</div>
+    <span data-username>同学</span>
+    <button class="btn btn-sm btn-ghost" onclick="logout()">退出</button>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div>
+      <h1>设置</h1>
+      <p class="sub">AI 服务、识图、联网校验、学习偏好与账号数据，全部集中在这里</p>
+    </div>
+    <span class="hint" id="head-state"></span>
+  </div>
+
+  <div class="settings-layout">
+    <aside class="settings-side">
+      <a href="#g-ai" class="active">AI 服务</a>
+      <a href="#g-ocr">识图与公式</a>
+      <a href="#g-search">联网校验</a>
+      <a href="#g-learn">学习偏好</a>
+      <a href="#g-account">账号与数据</a>
+      <a href="#g-diag">系统与诊断</a>
+    </aside>
+
+    <div class="settings-main">
+      <div class="msg" id="msg"></div>
+
+      <!-- ================= 1. AI 服务 ================= -->
+      <section class="card setting-card" id="g-ai">
+        <div class="card-title">
+          <h3>AI 服务</h3>
+          <span class="hint">保存后立即生效，不用重启 Tomcat</span>
+        </div>
+
+        <div class="field">
+          <label>运行模式</label>
+          <div class="tier-group" id="provider-group">
+            <button type="button" class="tier-btn" data-provider="ollama">本地 Ollama</button>
+            <button type="button" class="tier-btn" data-provider="cloud">云端 API</button>
+            <button type="button" class="tier-btn" data-provider="auto">自动（有云端 Key 优先云端）</button>
+            <button type="button" class="tier-btn" data-provider="local">仅本地规则</button>
+          </div>
+          <p class="hint" id="provider-hint"></p>
+        </div>
+
+        <div id="cloud-box" class="sub-box">
+          <div class="box-head"><b>云端 API</b><span class="badge" id="vendor-level"></span></div>
+          <div class="row">
+            <div class="field">
+              <label>厂商</label>
+              <select id="vendor"></select>
+            </div>
+            <div class="field">
+              <label>模型</label>
+              <input type="text" id="cloud-model" list="cloud-model-list" autocomplete="off">
+              <datalist id="cloud-model-list">
+                <option value="deepseek-flash"></option>
+                <option value="deepseek-v4-pro"></option>
+                <option value="deepseek-chat"></option>
+                <option value="deepseek-reasoner"></option>
+              </datalist>
+              <div class="tier-group hidden" id="ds-model-pick" style="margin-top:8px">
+                <button type="button" class="tier-btn" data-dsmodel="deepseek-flash">Flash · 快而省</button>
+                <button type="button" class="tier-btn" data-dsmodel="deepseek-v4-pro">V4 Pro · 更强</button>
+              </div>
+            </div>
+          </div>
+          <div class="notice" id="vendor-note"></div>
+          <div class="field">
+            <label>Base URL</label>
+            <input type="text" id="cloud-base" placeholder="https://api.deepseek.com/v1" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>API Key</label>
+            <div class="input-row">
+              <input type="password" id="cloud-key" autocomplete="new-password" maxlength="300">
+              <button class="btn btn-sm btn-ghost" type="button" id="key-eye">显示</button>
+              <button class="btn btn-sm btn-ghost" type="button" id="key-clear">清除</button>
+            </div>
+            <p class="hint" id="key-hint"></p>
+          </div>
+        </div>
+
+        <div id="local-box" class="sub-box">
+          <div class="box-head"><b>本机 Ollama</b><span class="badge" id="ollama-state"></span></div>
+          <div class="field">
+            <label>本地模型方案</label>
+            <div class="tier-group" id="local-plan">
+              <button type="button" class="tier-btn" data-localplan="full">完整 · qwen3 + qwen2.5vl</button>
+              <button type="button" class="tier-btn" data-localplan="light">轻量 · 仅 qwen2.5vl</button>
+            </div>
+            <p class="hint" id="local-plan-hint"></p>
+          </div>
+          <div class="field">
+            <label>服务地址</label>
+            <input type="text" id="ollama-base" placeholder="http://127.0.0.1:11434/v1" autocomplete="off">
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>文字模型</label>
+              <input type="text" id="ollama-text" placeholder="qwen3:8b" autocomplete="off">
+            </div>
+            <div class="field">
+              <label>视觉模型（识图）</label>
+              <input type="text" id="ollama-vision" placeholder="qwen2.5vl:7b" autocomplete="off">
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>空闲常驻时间（keep_alive）</label>
+              <input type="text" id="keep-alive" placeholder="5m" autocomplete="off">
+            </div>
+            <div class="field">
+              <label>显存调度</label>
+              <label class="check">
+                <input type="checkbox" id="single-model">
+                <span>同一时刻只加载一个模型（切换时自动卸载另一个）</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>超时（秒）</label>
+            <input type="number" id="timeout" min="5" max="600">
+          </div>
+          <div class="field">
+            <label>最大输出 token</label>
+            <input type="number" id="max-tokens" min="64" max="32000">
+          </div>
+          <div class="field">
+            <label>温度</label>
+            <input type="number" id="temperature" min="0" max="2" step="0.1">
+          </div>
+        </div>
+
+        <div class="setting-actions">
+          <button class="btn btn-primary" type="button" id="save-ai">保存并生效</button>
+          <button class="btn" type="button" id="test-ai">测试连接</button>
+          <button class="btn btn-ghost" type="button" id="reset-ai">恢复默认</button>
+        </div>
+        <div id="test-result"></div>
+      </section>
+
+      <!-- ================= 2. 识图与公式 ================= -->
+      <section class="card setting-card" id="g-ocr">
+        <div class="card-title">
+          <h3>识图与公式</h3>
+          <span class="hint">识图固定使用本机 Ollama 视觉模型</span>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label class="check">
+              <input type="checkbox" id="two-stage">
+              <span>两段式识别（先转写文字，再结构化）</span>
+            </label>
+            <p class="hint">关闭后回到「一次识图直出 JSON」，复杂公式题更容易失败</p>
+          </div>
+          <div class="field">
+            <label class="check">
+              <input type="checkbox" id="preprocess">
+              <span>识图前预处理图片</span>
+            </label>
+            <p class="hint">纠正拍照方向、统一分辨率、超长图切带</p>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>视觉最大输出 token</label>
+            <input type="number" id="vision-max-tokens" min="64" max="32000">
+          </div>
+          <div class="field">
+            <label>视觉上下文长度</label>
+            <input type="number" id="vision-num-ctx" min="512" max="131072" step="512">
+          </div>
+          <div class="field">
+            <label>视觉温度</label>
+            <input type="number" id="vision-temperature" min="0" max="2" step="0.1">
+          </div>
+        </div>
+        <div class="switch-row">
+          <label class="search-switch">
+            <input type="checkbox" id="katex-on">
+            <span class="switch-track"></span>
+            <b>公式用 KaTeX 渲染</b>
+          </label>
+          <span class="hint">仅本机浏览器；关闭后公式按纯文本显示</span>
+        </div>
+        <div class="switch-row">
+          <label class="search-switch">
+            <input type="checkbox" id="raw-open">
+            <span class="switch-track"></span>
+            <b>识别后自动展开「原始转写」</b>
+          </label>
+          <span class="hint">仅本机浏览器；方便核对模型读出的公式</span>
+        </div>
+        <div class="setting-actions">
+          <button class="btn btn-primary" type="button" id="save-ocr">保存识图设置</button>
+        </div>
+      </section>
+
+      <!-- ================= 3. 联网校验 ================= -->
+      <section class="card setting-card" id="g-search">
+        <div class="card-title">
+          <h3>联网校验</h3>
+          <span class="hint">开关与档位存本机；高级参数是服务端全局配置</span>
+        </div>
+        <div class="switch-row">
+          <label class="search-switch">
+            <input type="checkbox" id="search-on">
+            <span class="switch-track"></span>
+            <b>识别后自动联网校验</b>
+          </label>
+          <span class="hint" id="search-state"></span>
+        </div>
+        <div class="field">
+          <label>检索档位</label>
+          <div class="tier-group">
+            <button type="button" class="tier-btn" data-tier="default">默认档 · 免 Key</button>
+            <button type="button" class="tier-btn" data-tier="anysearch">AnySearch 档 · 需 Key</button>
+          </div>
+        </div>
+        <div class="field" id="anysearch-wrap">
+          <label>AnySearch API Key</label>
+          <div class="input-row">
+            <input type="password" id="anysearch-key" maxlength="200" autocomplete="off"
+                   placeholder="仅保存在本机浏览器">
+            <button class="btn btn-sm btn-ghost" type="button" id="any-key-eye">显示</button>
+            <button class="btn btn-sm btn-ghost" type="button" id="any-key-clear">清除</button>
+          </div>
+        </div>
+        <p class="hint">上传页的联网开关与这里同步；两边改的是同一份设置。</p>
+        <details class="diag-logs">
+          <summary>高级参数（服务端全局生效）</summary>
+          <div class="switch-row">
+            <label class="search-switch">
+              <input type="checkbox" id="search-enabled">
+              <span class="switch-track"></span>
+              <b>服务端允许联网校验</b>
+            </label>
+            <span class="hint">关闭后即使页面开关打开也不会请求检索</span>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>每次保留条数</label>
+              <input type="number" id="search-topn" min="1" max="10">
+            </div>
+            <div class="field">
+              <label>默认档 · 证据字数上限</label>
+              <input type="number" id="search-default-maxchars" min="200" max="10000" step="100">
+            </div>
+            <div class="field">
+              <label>默认档 · 超时（毫秒）</label>
+              <input type="number" id="search-default-timeout" min="500" max="30000" step="500">
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>AnySearch 档 · 证据字数上限</label>
+              <input type="number" id="search-any-maxchars" min="200" max="10000" step="100">
+            </div>
+            <div class="field">
+              <label>AnySearch 档 · 超时（毫秒）</label>
+              <input type="number" id="search-any-timeout" min="500" max="30000" step="500">
+            </div>
+          </div>
+          <div class="field">
+            <label>AnySearch 接口地址</label>
+            <input type="text" id="search-any-base" placeholder="https://api.anysearch.com/v1" autocomplete="off">
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>结果缓存条数</label>
+              <input type="number" id="search-cache-size" min="0" max="500">
+            </div>
+            <div class="field">
+              <label>缓存有效期（分钟）</label>
+              <input type="number" id="search-cache-ttl" min="1" max="10080" step="30">
+            </div>
+          </div>
+          <div class="setting-actions">
+            <button class="btn btn-primary" type="button" id="save-search">保存检索参数</button>
+            <span class="hint" id="search-save-state"></span>
+          </div>
+        </details>
+      </section>
+
+      <!-- ================= 4. 学习偏好 ================= -->
+      <section class="card setting-card" id="g-learn">
+        <div class="card-title">
+          <h3>学习偏好</h3>
+          <span class="hint">仅本机浏览器 · 用作上传页的默认值</span>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>默认学科</label>
+            <select id="default-subject"><option value="">不预设</option></select>
+          </div>
+          <div class="field">
+            <label>默认题型</label>
+            <select id="default-type"></select>
+          </div>
+          <div class="field">
+            <label>默认难度</label>
+            <select id="default-difficulty">
+              <option value="">不预设</option>
+              <option value="1">简单</option>
+              <option value="2">中等</option>
+              <option value="3">困难</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting-actions">
+          <button class="btn btn-primary" type="button" id="save-learn">保存偏好</button>
+          <span class="hint" id="learn-state"></span>
+        </div>
+      </section>
+
+      <!-- ================= 5. 账号与数据 ================= -->
+      <section class="card setting-card" id="g-account">
+        <div class="card-title">
+          <h3>账号与数据</h3>
+          <span class="hint" id="account-name"></span>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>昵称</label>
+            <div class="input-row">
+              <input type="text" id="nickname" maxlength="50" autocomplete="off">
+              <button class="btn btn-sm" type="button" id="save-nickname">保存</button>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>原密码</label>
+            <input type="password" id="old-password" autocomplete="current-password">
+          </div>
+          <div class="field">
+            <label>新密码（至少 6 位）</label>
+            <input type="password" id="new-password" autocomplete="new-password">
+          </div>
+          <div class="field" style="align-self:flex-end">
+            <button class="btn" type="button" id="save-password">修改密码</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="row">
+          <div class="field">
+            <label>导出错题</label>
+            <p class="hint">把当前账号的全部错题导出为 JSON 文件，可用于备份或迁移</p>
+            <button class="btn" type="button" id="export-questions">导出 JSON</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 6. 系统与诊断 ================= -->
+      <section class="card setting-card" id="g-diag">
+        <div class="card-title">
+          <h3>系统与诊断</h3>
+          <span class="hint">只读信息，排查「为什么 AI 不工作」</span>
+        </div>
+        <div class="diag-grid" id="diag-grid">
+          <span class="hint">加载中…</span>
+        </div>
+        <details class="diag-logs">
+          <summary>最近 5 次 AI 调用</summary>
+          <div id="diag-logs" class="hint">—</div>
+        </details>
+        <div class="setting-actions">
+          <button class="btn" type="button" id="refresh-diag">刷新诊断</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/qtype.js"></script>
+<script src="js/settings.js"></script>
+</body>
+</html>

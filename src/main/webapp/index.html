@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 · AI 学习助手</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <aside class="auth-side">
+    <h2>AI 学习助手<br>让每一道错题都有回响</h2>
+    <p class="lead">拍照上传错题，按学科与知识点自动归类，沉淀属于你的知识薄弱图谱。</p>
+    <div class="auth-features">
+      <div class="auth-feature">
+        <div class="dot">📷</div>
+        <div><b>题目图片上传</b><span>手机拍照即可归档，自动保存到个人题库</span></div>
+      </div>
+      <div class="auth-feature">
+        <div class="dot">🗂️</div>
+        <div><b>学科 / 知识点分类</b><span>数学、物理、英语等学科，细到知识点维度</span></div>
+      </div>
+      <div class="auth-feature">
+        <div class="dot">📈</div>
+        <div><b>错题分析看板</b><span>统计各学科错题分布，找准复习重点</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-card">
+      <div class="brand"><span class="logo">AI</span> 学习助手</div>
+      <h2 id="form-title">欢迎回来</h2>
+      <p class="sub" id="form-sub">登录后继续管理你的错题本</p>
+
+      <div class="tabs">
+        <button type="button" class="active" data-tab="login">登录</button>
+        <button type="button" data-tab="register">注册</button>
+      </div>
+
+      <div class="msg" id="msg"></div>
+
+      <form id="auth-form" autocomplete="off">
+        <div class="field">
+          <label for="username">账号</label>
+          <input type="text" id="username" name="username" placeholder="3-20 位字母、数字或下划线" required>
+        </div>
+        <div class="field" id="nickname-field" style="display:none">
+          <label for="nickname">昵称</label>
+          <input type="text" id="nickname" name="nickname" placeholder="选填，默认与账号相同">
+        </div>
+        <div class="field">
+          <label for="password">密码</label>
+          <input type="password" id="password" name="password" placeholder="至少 6 位" required>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" id="submit-btn">登录</button>
+      </form>
+
+      <div class="demo-tip">演示账号：<b>student</b> / <b>123456</b></div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  (function () {
+    let mode = 'login';
+    const msg = document.getElementById('msg');
+    const form = document.getElementById('auth-form');
+    const nicknameField = document.getElementById('nickname-field');
+    const submitBtn = document.getElementById('submit-btn');
+    const title = document.getElementById('form-title');
+    const sub = document.getElementById('form-sub');
+
+    if (new URLSearchParams(location.search).get('expired')) {
+      showMsg('登录状态已过期，请重新登录', 'error');
+    }
+
+    document.querySelectorAll('.tabs button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        mode = btn.dataset.tab;
+        const isLogin = mode === 'login';
+        nicknameField.style.display = isLogin ? 'none' : 'block';
+        submitBtn.textContent = isLogin ? '登录' : '注册并登录';
+        title.textContent = isLogin ? '欢迎回来' : '创建账号';
+        sub.textContent = isLogin ? '登录后继续管理你的错题本' : '几秒钟即可拥有个人错题本';
+        hideMsg();
+      });
+    });
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      hideMsg();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const nickname = document.getElementById('nickname').value.trim();
+      if (!username || !password) {
+        showMsg('请输入账号和密码', 'error');
+        return;
+      }
+      submitBtn.disabled = true;
+      submitBtn.textContent = mode === 'login' ? '登录中…' : '注册中…';
+      try {
+        const path = mode === 'login' ? 'auth/login.action' : 'auth/register.action';
+        await Api.post(path, { username: username, password: password, nickname: nickname });
+        showMsg(mode === 'login' ? '登录成功，正在进入…' : '注册成功，正在进入…', 'ok');
+        setTimeout(function () { location.href = 'home.html'; }, 400);
+      } catch (err) {
+        showMsg(err.message, 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = mode === 'login' ? '登录' : '注册并登录';
+      }
+    });
+
+    function showMsg(text, type) {
+      msg.textContent = text;
+      msg.className = 'msg show ' + type;
+    }
+    function hideMsg() { msg.className = 'msg'; }
+
+    // 已登录则直接进入首页
+    Api.get('auth/me.action').then(function () { location.href = 'home.html'; }).catch(function () {});
+  })();
+</script>
+</body>
+</html>
